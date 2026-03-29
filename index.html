@@ -12,10 +12,9 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
     <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
-    <script src="https://unpkg.com/recharts@2.12.2/umd/Recharts.js"></script>
     
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.js"></script>
+    <script src="https://unpkg.com/recharts@2.12.2/umd/Recharts.js"></script>
+    <script src="https://unpkg.com/lucide-react@0.344.0/dist/umd/lucide-react.js"></script>
     
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -23,25 +22,32 @@
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap');
-        body { font-family: 'Heebo', sans-serif; margin: 0; padding: 0; }
+        body { 
+            font-family: 'Heebo', sans-serif; 
+            margin: 0; 
+            background-color: #f8fafc;
+            color: #0f172a;
+        }
         .animate-slide { animation: slide-up 0.4s ease-out both; }
         @keyframes slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .animate-bounce-in { animation: bounce-in 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes bounce-in { 0% { transform: scale(0.3); opacity: 0; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); } }
     </style>
 </head>
-<body class="bg-slate-50">
+<body>
     <div id="root"></div>
 
     <script type="text/babel">
-        // פונקציה שמחכה שכל הספריות יהיו זמינות
-        const initApp = () => {
+        // פונקציה ראשית שמתחילה הכל רק כשהדף מוכן
+        const startApp = () => {
             const { useState, useEffect, useMemo } = React;
             
-            // הגנה: אם הספריות לא נטענו, נשתמש באובייקט ריק כדי למנוע קריסה
-            const rechartsObj = window.Recharts || {};
-            const lucideObj = window.lucideReact || window.Lucide || {};
+            // שליפת רכיבים מהחלון הגלובלי עם הגנות למניעת undefined
+            const RechartsObj = window.Recharts || {};
+            const LucideObj = window.lucideReact || {};
 
-            const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } = rechartsObj;
-            const { Users, Trophy, ChevronRight, Send, BarChart2, Award, Clock, CheckCircle2, XCircle, Settings, Save, Plus, Trash2, LogOut, MessageSquare } = lucideObj;
+            const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } = RechartsObj;
+            const { Users, Trophy, ChevronRight, Send, BarChart2, Award, CheckCircle2, XCircle } = LucideObj;
 
             // Firebase Config
             const firebaseConfig = {
@@ -61,14 +67,23 @@
             const QUESTIONS = [
                 { id: 1, type: 'wordcloud', question: "מהם הדברים שיש לוודא טרם הגעה לתדריך למשלחת?", description: "כתבו מילה או שתיים שחשוב לבדוק מראש" },
                 { id: 2, type: 'multiple', question: "היכן ניתן לראות את רמת האיום בכל מדינה?", options: [{ id: 'a', text: "א. באתר השגרירות" }, { id: 'b', text: "ב. מידע לא נגיש" }, { id: 'c', text: "ג. באתר המל\"ל", correct: true }, { id: 'd', text: "ד. בתקשורת" }] },
-                { id: 3, type: 'multiple_select', question: "איזה משפט הכי נכון?", options: [{ id: 'a', text: "א. תדריך אחיד" }, { id: 'b', text: "ב. להפחיד" }, { id: 'c', text: "ג. מדויק למשלחת", correct: true }, { id: 'd', text: "ד. מערב משתתפים", correct: true }] }
+                { id: 3, type: 'multiple_select', question: "איזה משפט הכי נכון?", hint: "יש יותר מתשובה אחת נכונה", options: [{ id: 'a', text: "א. תדריך אחיד" }, { id: 'b', text: "ב. להפחיד" }, { id: 'c', text: "ג. מדויק למשלחת", correct: true }, { id: 'd', text: "ד. מערב משתתפים", correct: true }] },
+                { id: 4, type: 'multiple', question: "האם הורים נחשבים מלווים?", options: [{ id: 'a', text: "א. כן, כמבוגר אחראי" }, { id: 'b', text: "ב. לא, למעט חריגים", correct: true }, { id: 'c', text: "ג. כן, באישור" }, { id: 'd', text: "ד. לא, לא היו בתדריך" }] },
+                { id: 5, type: 'multiple', question: "מה המפתח של מלווים למשלחת עצמאית?", options: [{ id: 'a', text: "א. מנהל + 1 לכל 15", correct: true }, { id: 'b', text: "ב. מנהל + 1 לכל 10" }, { id: 'c', text: "ג. מנהל + 1 לכל 20" }, { id: 'd', text: "ד. 1 לכל 15 ללא מנהל" }] }
             ];
 
             function App() {
                 const [user, setUser] = useState(null);
                 const [playerName, setPlayerName] = useState('');
                 const [currentStep, setCurrentStep] = useState('login');
+                const [questionIndex, setQuestionIndex] = useState(0);
+                const [selectedOptions, setSelectedOptions] = useState([]);
+                const [wordCloudInput, setWordCloudInput] = useState('');
+                const [startTime, setStartTime] = useState(null);
+                const [hasAnswered, setHasAnswered] = useState(false);
+                const [lastResult, setLastResult] = useState(null);
                 const [players, setPlayers] = useState([]);
+                const [dynamicQuestions, setDynamicQuestions] = useState(QUESTIONS);
 
                 useEffect(() => {
                     const unsub = auth.onAuthStateChanged(async (u) => {
@@ -80,64 +95,211 @@
 
                 useEffect(() => {
                     if (!user) return;
-                    return db.collection('artifacts').doc(appId).collection('public').doc('data').collection('players')
-                        .onSnapshot(s => setPlayers(s.docs.map(d => ({id: d.id, ...d.data()}))));
+                    const path = db.collection('artifacts').doc(appId).collection('public').doc('data');
+                    
+                    const unsubPlayers = path.collection('players').onSnapshot(s => {
+                        setPlayers(s.docs.map(d => ({id: d.id, ...d.data()})));
+                    });
+                    
+                    const unsubConfig = path.collection('config').doc('questions').onSnapshot(s => {
+                        if (s.exists && s.data().list) setDynamicQuestions(s.data().list);
+                    });
+
+                    return () => { unsubPlayers(); unsubConfig(); };
                 }, [user]);
 
                 const handleJoin = async () => {
-                    if (!playerName.trim()) return;
+                    if (!playerName.trim() || !user) return;
                     await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('players').doc(user.uid).set({
-                        name: playerName, score: 0, lastActive: Date.now()
+                        name: playerName, score: 0, totalTime: 0, lastActive: Date.now()
                     });
                     setCurrentStep('lobby');
                 };
 
-                return (
-                    <div className="min-h-screen flex flex-col items-center p-6" dir="rtl">
-                        <nav className="w-full max-w-4xl flex justify-between items-center mb-10 bg-white p-4 rounded-2xl shadow-sm border">
-                            <div className="flex items-center gap-2 font-black text-xl text-blue-600">
-                                {Award && <Award />} <span>תדריך משלחת</span>
-                            </div>
-                            {playerName && <div className="font-bold text-slate-600">{playerName}</div>}
-                        </nav>
+                const submitAnswer = async () => {
+                    if (hasAnswered || !user) return;
+                    const timeTaken = (Date.now() - (startTime || Date.now())) / 1000;
+                    const q = dynamicQuestions[questionIndex];
+                    let isCorrect = false;
 
-                        <div className="w-full max-w-md animate-slide">
+                    if (q.type === 'wordcloud') isCorrect = true;
+                    else if (q.type === 'multiple') isCorrect = selectedOptions[0] === q.options.find(o => o.correct)?.id;
+                    else if (q.type === 'multiple_select') {
+                        const correctIds = q.options.filter(o => o.correct).map(o => o.id).sort().join(',');
+                        isCorrect = correctIds === [...selectedOptions].sort().join(',');
+                    }
+
+                    let points = 0;
+                    if (isCorrect && q.type !== 'wordcloud') {
+                        points = Math.max(100 - Math.floor(timeTaken), 50);
+                        const p = players.find(p => p.id === user.uid);
+                        await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('players').doc(user.uid).update({
+                            score: (p?.score || 0) + points,
+                            totalTime: (p?.totalTime || 0) + timeTaken
+                        });
+                    }
+
+                    setLastResult({ isCorrect, points });
+                    setHasAnswered(true);
+                    setCurrentStep('feedback');
+                };
+
+                const leaderboard = useMemo(() => [...players].sort((a,b) => (b.score||0)-(a.score||0)).slice(0,5), [players]);
+
+                return (
+                    <div className="min-h-screen flex flex-col items-center p-4 md:p-8" dir="rtl">
+                        <header className="w-full max-w-4xl flex justify-between items-center mb-8 bg-white p-5 rounded-[1.5rem] shadow-sm border border-slate-100">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-blue-600 p-2 rounded-xl text-white">
+                                    {Award ? <Award size={24} /> : '🏆'}
+                                </div>
+                                <h1 className="text-xl font-black tracking-tight">משחק תדריך משלחת</h1>
+                            </div>
+                            {playerName && (
+                                <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-full font-bold text-sm border border-blue-100">
+                                    {playerName}
+                                </div>
+                            )}
+                        </header>
+
+                        <main className="w-full max-w-2xl">
                             {currentStep === 'login' && (
-                                <div className="bg-white p-8 rounded-[2rem] shadow-xl border text-center">
-                                    {Users && <Users size={48} className="mx-auto text-blue-500 mb-4" />}
-                                    <h2 className="text-3xl font-black mb-6">ברוכים הבאים</h2>
+                                <div className="bg-white p-10 rounded-[2.5rem] shadow-xl border text-center animate-slide">
+                                    {Users && <Users size={64} className="mx-auto text-blue-500 mb-6" />}
+                                    <h2 className="text-3xl font-black mb-2 text-slate-800">ברוכים הבאים</h2>
+                                    <p className="text-slate-500 mb-8 font-medium">הזינו את שמכם כדי להצטרף לחידון</p>
                                     <input 
                                         type="text" 
-                                        className="w-full p-4 rounded-xl bg-slate-50 border-2 mb-4 text-center text-lg font-bold outline-none focus:border-blue-500" 
-                                        placeholder="מה השם שלך?" 
+                                        className="w-full p-5 rounded-2xl bg-slate-50 border-2 mb-4 text-center text-xl font-bold outline-none focus:border-blue-500 transition-all shadow-inner" 
+                                        placeholder="איך קוראים לך?" 
                                         value={playerName} 
                                         onChange={e => setPlayerName(e.target.value)} 
                                     />
-                                    <button onClick={handleJoin} className="w-full bg-blue-600 text-white py-4 rounded-xl font-black text-lg shadow-lg">הצטרפות</button>
+                                    <button onClick={handleJoin} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-xl shadow-lg hover:bg-blue-700 transition-all active:scale-95">הצטרפות למשחק</button>
                                 </div>
                             )}
 
                             {currentStep === 'lobby' && (
-                                <div className="bg-white p-8 rounded-[2rem] shadow-xl border text-center">
-                                    <h2 className="text-2xl font-black mb-6">ממתינים למתחילים...</h2>
-                                    <div className="grid grid-cols-2 gap-2 mb-8">
-                                        {players.map(p => <div key={p.id} className="p-3 bg-slate-50 rounded-lg font-bold border">{p.name}</div>)}
+                                <div className="bg-white p-10 rounded-[2.5rem] shadow-xl border text-center animate-slide">
+                                    <h2 className="text-2xl font-black mb-8">המשתתפים בלובי ({players.length})</h2>
+                                    <div className="grid grid-cols-2 gap-3 mb-10">
+                                        {players.map(p => (
+                                            <div key={p.id} className="p-4 bg-slate-50 rounded-xl font-bold border border-slate-100 truncate">
+                                                {p.name}
+                                            </div>
+                                        ))}
                                     </div>
-                                    <p className="text-slate-500">כבר מתחילים!</p>
+                                    <button 
+                                        onClick={() => { setQuestionIndex(0); setStartTime(Date.now()); setCurrentStep('quiz'); }} 
+                                        className="bg-green-600 text-white px-12 py-5 rounded-2xl font-black text-xl shadow-lg hover:bg-green-700 animate-pulse"
+                                    >
+                                        התחל חידון!
+                                    </button>
                                 </div>
                             )}
-                        </div>
+
+                            {currentStep === 'quiz' && dynamicQuestions[questionIndex] && (
+                                <div className="space-y-6 animate-slide">
+                                    <div className="bg-white p-8 rounded-[2rem] shadow-lg border-b-4 border-blue-500">
+                                        <h2 className="text-2xl md:text-3xl font-black leading-tight text-slate-800">
+                                            {dynamicQuestions[questionIndex].question}
+                                        </h2>
+                                    </div>
+                                    <div className="grid gap-3">
+                                        {dynamicQuestions[questionIndex].type === 'wordcloud' ? (
+                                            <div className="flex gap-2 bg-white p-6 rounded-[2rem] border-2">
+                                                <input 
+                                                    type="text" 
+                                                    className="flex-1 p-4 rounded-xl bg-slate-50 border text-xl font-bold outline-none" 
+                                                    value={wordCloudInput} 
+                                                    onChange={e => setWordCloudInput(e.target.value)} 
+                                                    placeholder="הקלידו תשובה..." 
+                                                />
+                                                <button onClick={submitAnswer} className="bg-blue-600 text-white px-6 rounded-xl flex items-center justify-center">
+                                                    {Send && <Send />}
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            dynamicQuestions[questionIndex].options.map(opt => (
+                                                <button 
+                                                    key={opt.id} 
+                                                    onClick={() => dynamicQuestions[questionIndex].type === 'multiple' ? setSelectedOptions([opt.id]) : setSelectedOptions(prev => prev.includes(opt.id) ? prev.filter(x => x !== opt.id) : [...prev, opt.id])}
+                                                    className={`p-6 rounded-2xl border-2 text-right font-bold text-lg transition-all ${selectedOptions.includes(opt.id) ? 'border-blue-500 bg-blue-50 shadow-md' : 'bg-white border-slate-100 hover:border-slate-300'}`}
+                                                >
+                                                    {opt.text}
+                                                </button>
+                                            ))
+                                        )}
+                                    </div>
+                                    {dynamicQuestions[questionIndex].type !== 'wordcloud' && (
+                                        <button onClick={submitAnswer} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-xl shadow-lg">אישור</button>
+                                    )}
+                                </div>
+                            )}
+
+                            {currentStep === 'feedback' && (
+                                <div className="text-center mt-12 animate-bounce-in bg-white p-12 rounded-[3rem] shadow-xl border">
+                                    <div className={`mx-auto w-24 h-24 rounded-full flex items-center justify-center mb-6 ${lastResult?.isCorrect ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                                        {lastResult?.isCorrect ? (CheckCircle2 ? <CheckCircle2 size={48} /> : '✔') : (XCircle ? <XCircle size={48} /> : '✖')}
+                                    </div>
+                                    <h2 className="text-5xl font-black mb-4">{lastResult?.isCorrect ? "כל הכבוד!" : "טעות..."}</h2>
+                                    <p className="text-xl text-slate-500 mb-10">צברת {lastResult?.points || 0} נקודות</p>
+                                    <button onClick={() => setCurrentStep('leaderboard')} className="bg-slate-900 text-white py-5 px-16 rounded-2xl text-xl font-bold">לתוצאות</button>
+                                </div>
+                            )}
+
+                            {currentStep === 'leaderboard' && (
+                                <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl border animate-slide">
+                                    <h2 className="text-2xl font-black mb-8 flex items-center gap-2">
+                                        {BarChart2 && <BarChart2 className="text-blue-600" />} טבלת מובילים
+                                    </h2>
+                                    <div className="space-y-3">
+                                        {leaderboard.map((p, i) => (
+                                            <div key={p.id} className={`flex justify-between p-5 rounded-2xl font-bold border ${p.id === user.uid ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}>
+                                                <span>{i+1}. {p.name}</span>
+                                                <span className="text-blue-600">{p.score} נק'</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <button 
+                                        onClick={() => {
+                                            if (questionIndex < dynamicQuestions.length - 1) {
+                                                setQuestionIndex(q => q + 1);
+                                                setSelectedOptions([]);
+                                                setHasAnswered(false);
+                                                setStartTime(Date.now());
+                                                setWordCloudInput('');
+                                                setCurrentStep('quiz');
+                                            } else {
+                                                setCurrentStep('results');
+                                            }
+                                        }}
+                                        className="w-full bg-blue-600 text-white py-5 rounded-2xl mt-10 font-black text-lg"
+                                    >
+                                        {questionIndex < dynamicQuestions.length - 1 ? "לשאלה הבאה" : "סיום המשחק"}
+                                    </button>
+                                </div>
+                            )}
+
+                            {currentStep === 'results' && (
+                                <div className="text-center mt-10 animate-slide">
+                                    {Trophy && <Trophy size={100} className="text-amber-500 mx-auto mb-6" />}
+                                    <h2 className="text-5xl font-black mb-4 text-slate-800">החידון הסתיים!</h2>
+                                    <p className="text-2xl text-slate-500 mb-12">תודה על ההשתתפות</p>
+                                    <button onClick={() => window.location.reload()} className="bg-slate-900 text-white py-6 px-20 rounded-2xl text-xl font-black shadow-2xl">משחק חדש</button>
+                                </div>
+                            )}
+                        </main>
                     </div>
                 );
             }
 
             const root = ReactDOM.createRoot(document.getElementById('root'));
             root.render(<App />);
-            console.log("🚀 System Ready: App Rendered");
         };
 
-        // הפעלה רק כשהחלון מוכן
-        window.onload = initApp;
+        // מפעיל את האפליקציה רק אחרי שכל ה-HTML והסקריפטים נטענו
+        window.onload = startApp;
     </script>
 </body>
 </html>
