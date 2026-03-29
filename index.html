@@ -1,757 +1,575 @@
-<!DOCTYPE html>
-<html lang="he" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>חידון טריוויה ארגוני</title>
-    
-    <!-- Google Fonts: Heebo -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet">
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Heebo', 'sans-serif'],
-                    }
-                }
-            }
-        }
-    </script>
-    
-    <!-- Firebase SDK -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, getDocs, collection, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import React, { useState, useEffect, useMemo } from 'react';
+import { initializeApp } from 'firebase/app';
+import { 
+  getAuth, 
+  signInAnonymously, 
+  onAuthStateChanged, 
+  signInWithCustomToken 
+} from 'firebase/auth';
+import { 
+  getFirestore, 
+  collection, 
+  doc, 
+  setDoc, 
+  onSnapshot, 
+  addDoc 
+} from 'firebase/firestore';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
+import { Users, Trophy, ChevronRight, Send, BarChart2, Award, Clock, CheckCircle2, XCircle, Settings, Save, Plus, Trash2, LogOut, MessageSquare } from 'lucide-react';
 
-        // Global State
-        let currentUser = null;
-        let myPlayerData = { score: 0, completedStages: [] };
-        let players = [];
-        let settings = { stage1: true, stage2: false, stage3: false, stage4: false };
-        let allQuestions = [];
+// Firebase Configuration from environment
+const firebaseConfig = JSON.parse(__firebase_config);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'delegation-quiz-v5';
+
+const DEFAULT_QUESTIONS = [
+  {
+    id: 1,
+    type: 'wordcloud',
+    question: "מהם הדברים שיש לוודא טרם הגעה לתדריך למשלחת?",
+    description: "כתבו מילה או שתיים שחשוב לבדוק מראש"
+  },
+  {
+    id: 2,
+    type: 'multiple',
+    question: "היכן ניתן לראות את רמת האיום בכל מדינה?",
+    options: [
+      { id: 'a', text: "א. באתר השגרירות" },
+      { id: 'b', text: "ב. זה לא מידע נגיש, יש לשאול את מודיעין היחידה" },
+      { id: 'c', text: "ג. באתר המל\"ל", correct: true },
+      { id: 'd', text: "ד. בכלי התקשורת ביחס למצב המדיני" }
+    ]
+  },
+  {
+    id: 3,
+    type: 'multiple_select',
+    question: "איזה משפט הכי נכון?",
+    hint: "יש יותר מתשובה אחת נכונה",
+    options: [
+      { id: 'a', text: "א. תדריך טוב יכול לעבור לכל משלחת אותו הדבר" },
+      { id: 'b', text: "ב. תדריך טוב צריך להפחיד את הנוסעים לגבי מה עלול לקרות" },
+      { id: 'c', text: "ג. תדריך טוב צריך להיות מדויק למשלחת הספציפית", correct: true },
+      { id: 'd', text: "ד. תדריך טוב מערב את המשתתפים בעזרת שאלות ומתודות", correct: true }
+    ]
+  },
+  {
+    id: 4,
+    type: 'multiple',
+    question: "האם הורים נחשבים מלווים?",
+    options: [
+      { id: 'a', text: "א. כן, הורה יכול להיחשב כחבר משלחת כאשר הוא משמש כמבוגר אחראי במסגרת המשלחת." },
+      { id: 'b', text: "ב. לא, הורה אינו נכלל ברשימת חברי המשלחת, למעט מקרים חריגים בהם הדבר מאושר (כגון משלחות לפולין).", correct: true },
+      { id: 'c', text: "ג. כן, הורה יכול להיחשב כחבר משלחת בכפוף לאישור הנהלת בית הספר." },
+      { id: 'd', text: "ד. לא, הורה אינו נכלל כחבר משלחת מאחר שלא השתתף בתדריך הקב\"ט." }
+    ]
+  },
+  {
+    id: 5,
+    type: 'multiple',
+    question: "מה המפתח של מלווים מבוגרים למשלחת עצמאית?",
+    options: [
+      { id: 'a', text: "א. במשלחת עצמאית נדרש מנהל משלחת מעל גיל 21 בעל הכשרה ותעודה בתוקף, וכן מלווה מבוגר אחד על כל 15 תלמידים.", correct: true },
+      { id: 'b', text: "ב. במשלחת עצמאית נדרש מנהל משלחת מעל גיל 21, וכן מלווה מבוגר אחד על כל 10 תלמידים." },
+      { id: 'c', text: "ג. במשלחת עצמאית נדרש מנהל משלחת ומלווה מבוגר אחד על כל 20 תלמידים." },
+      { id: 'd', text: "ד. במשלחת עצמאית נדרש מלווה מבוגר אחד על כל 15 תלמידים, ללא חובה למנהל משלחת." }
+    ]
+  }
+];
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [playerName, setPlayerName] = useState('');
+  const [currentStep, setCurrentStep] = useState('login'); 
+  const [questionIndex, setQuestionIndex] = useState(0);
+  const [selectedOptions, setSelectedOptions] = useState([]);
+  const [wordCloudInput, setWordCloudInput] = useState('');
+  const [startTime, setStartTime] = useState(null);
+  const [hasAnswered, setHasAnswered] = useState(false);
+  const [lastQuestionResult, setLastQuestionResult] = useState(null);
+  
+  const [players, setPlayers] = useState([]);
+  const [answers, setAnswers] = useState([]);
+  const [dynamicQuestions, setDynamicQuestions] = useState(DEFAULT_QUESTIONS);
+  const [adminPass, setAdminPass] = useState('');
+
+  // 1. Core Actions
+  const startQuiz = () => {
+    setQuestionIndex(0);
+    setCurrentStep('quiz');
+    setStartTime(Date.now());
+    setHasAnswered(false);
+  };
+
+  const nextFromFeedback = () => {
+    setCurrentStep('leaderboard');
+  };
+
+  const nextQuestion = () => {
+    if (questionIndex < dynamicQuestions.length - 1) {
+      setQuestionIndex(prev => prev + 1);
+      setSelectedOptions([]);
+      setWordCloudInput('');
+      setStartTime(Date.now());
+      setHasAnswered(false);
+      setCurrentStep('quiz');
+    } else {
+      setCurrentStep('results');
+    }
+  };
+
+  // 2. Auth & Sync
+  useEffect(() => {
+    const initAuth = async () => {
+      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+        try {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } catch (e) {
+          await signInAnonymously(auth);
+        }
+      } else {
+        await signInAnonymously(auth);
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, setUser);
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    // Sync Questions
+    const questionsDoc = doc(db, 'artifacts', appId, 'public', 'data', 'config', 'questions');
+    const unsubQuestions = onSnapshot(questionsDoc, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data && data.list) setDynamicQuestions(data.list);
+      }
+    });
+
+    // Sync Players
+    const playersRef = collection(db, 'artifacts', appId, 'public', 'data', 'players');
+    const unsubPlayers = onSnapshot(playersRef, (snapshot) => {
+      setPlayers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    // Sync Answers
+    const answersRef = collection(db, 'artifacts', appId, 'public', 'data', 'answers');
+    const unsubAnswers = onSnapshot(answersRef, (snapshot) => {
+      setAnswers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    return () => {
+      unsubQuestions();
+      unsubPlayers();
+      unsubAnswers();
+    };
+  }, [user]);
+
+  const handleJoin = async () => {
+    if (!playerName.trim() || !user) return;
+    const playerRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
+    await setDoc(playerRef, {
+      name: String(playerName),
+      score: 0,
+      totalTime: 0,
+      lastActive: Date.now()
+    });
+    setCurrentStep('lobby');
+  };
+
+  const submitAnswer = async () => {
+    if (hasAnswered || !user) return;
+    const endTime = Date.now();
+    const timeTaken = (endTime - (startTime || endTime)) / 1000;
+    const currentQ = dynamicQuestions[questionIndex];
+    let isCorrect = false;
+
+    // Check correctness
+    if (currentQ.type === 'wordcloud') {
+      isCorrect = true; 
+    } else if (currentQ.type === 'multiple') {
+      const correctOption = currentQ.options.find(o => o.correct);
+      isCorrect = selectedOptions[0] === correctOption?.id;
+    } else if (currentQ.type === 'multiple_select') {
+      const correctIds = currentQ.options.filter(o => o.correct).map(o => o.id).sort().join(',');
+      const selectedIds = [...selectedOptions].sort().join(',');
+      isCorrect = correctIds === selectedIds;
+    }
+
+    // Scoring (SKIP Wordcloud)
+    let pointsEarned = 0;
+    if (isCorrect && currentQ.type !== 'wordcloud') {
+      pointsEarned = Math.max(100 - Math.floor(timeTaken), 50);
+      const playerRef = doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid);
+      const currentPlayer = players.find(p => p.id === user.uid);
+      await setDoc(playerRef, {
+        ...currentPlayer,
+        score: (currentPlayer?.score || 0) + pointsEarned,
+        totalTime: (currentPlayer?.totalTime || 0) + timeTaken
+      });
+    }
+
+    // Save individual record
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'answers'), {
+      playerId: user.uid,
+      playerName: String(playerName),
+      questionId: currentQ.id,
+      answer: currentQ.type === 'wordcloud' ? String(wordCloudInput) : selectedOptions,
+      isCorrect,
+      timeTaken,
+      timestamp: Date.now()
+    });
+
+    setLastQuestionResult({ isCorrect, points: pointsEarned, type: currentQ.type });
+    setHasAnswered(true);
+    setCurrentStep('feedback');
+  };
+
+  // 3. Helpers
+  const leaderboard = useMemo(() => {
+    return [...players]
+      .sort((a, b) => (b.score || 0) - (a.score || 0) || (a.totalTime || 0) - (b.totalTime || 0))
+      .slice(0, 5);
+  }, [players]);
+
+  const wordCloudData = useMemo(() => {
+    const q1Answers = answers.filter(a => a.questionId === dynamicQuestions[0]?.id);
+    const wordFreq = {};
+    q1Answers.forEach(ans => {
+      if (typeof ans.answer === 'string') {
+        ans.answer.split(/[\s,]+/).filter(w => w.length > 1).forEach(w => {
+          wordFreq[w] = (wordFreq[w] || 0) + 1;
+        });
+      }
+    });
+    return Object.entries(wordFreq).map(([text, value]) => ({ text, value }));
+  }, [answers, dynamicQuestions]);
+
+  const getQuestionStats = (qId) => {
+    const q = dynamicQuestions.find(qi => qi.id === qId);
+    if (!q || q.type === 'wordcloud') return [];
+    const relevantAnswers = answers.filter(a => a.questionId === qId);
+    return q.options.map(opt => ({
+      name: opt.text.length > 12 ? opt.text.substring(0, 12) + '...' : opt.text,
+      fullName: opt.text,
+      count: relevantAnswers.filter(ans => Array.isArray(ans.answer) && ans.answer.includes(opt.id)).length,
+      isCorrect: opt.correct
+    }));
+  };
+
+  const checkAdminLogin = () => {
+    if (adminPass === '12345') setCurrentStep('admin_panel');
+  };
+
+  const saveQuestions = async (newList) => {
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'questions'), {
+        list: newList
+      });
+      alert("השאלות נשמרו בהצלחה!");
+    } catch (e) {
+      console.error("Save error:", e);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-heebo" dir="rtl">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap');
+        .font-heebo { font-family: 'Heebo', sans-serif; }
+        @keyframes bounce-in { 0% { transform: scale(0.3); opacity: 0; } 50% { transform: scale(1.05); opacity: 1; } 70% { transform: scale(0.9); } 100% { transform: scale(1); } }
+        .animate-bounce-in { animation: bounce-in 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .animate-slide { animation: slide-up 0.4s ease-out both; }
+        @keyframes slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+      `}</style>
+
+      {/* Navbar */}
+      <nav className="bg-white border-b px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="bg-blue-600 p-2 rounded-xl text-white">
+            <Award size={24} />
+          </div>
+          <h1 className="text-xl font-black text-slate-800">משחק תדריך משלחת</h1>
+        </div>
+        {playerName && currentStep !== 'admin_panel' && (
+          <div className="bg-blue-50 text-blue-700 px-4 py-1.5 rounded-full text-sm font-bold border border-blue-100 flex items-center gap-2">
+            <div className="w-2 bg-green-500 h-2 rounded-full animate-pulse"></div>
+            {String(playerName)}
+          </div>
+        )}
+      </nav>
+
+      <main className="max-w-4xl mx-auto p-4 md:p-8">
         
-        // Game State
-        let currentStageId = null;
-        let stageQuestions = [];
-        let currentQuestionIndex = 0;
-        let scoreCounter = 0;
-        let timerInterval = null;
-        let timeLeft = 0;
-        let selectedAnswer = null;
+        {/* LOGIN */}
+        {currentStep === 'login' && (
+          <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl border border-slate-100 text-center mt-10 animate-slide">
+            <Users className="text-blue-600 mx-auto mb-6" size={60} />
+            <h2 className="text-4xl font-black mb-3 text-slate-800">ברוכים הבאים</h2>
+            <p className="text-slate-500 mb-10 text-lg">הכנה למשלחות – בואו נראה מה אתם יודעים!</p>
+            <div className="max-w-sm mx-auto space-y-4">
+              <input
+                type="text" placeholder="הקלידו את שמכם..."
+                className="w-full px-8 py-5 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white outline-none text-xl text-center font-bold"
+                value={playerName} onChange={(e) => setPlayerName(e.target.value)}
+              />
+              <button onClick={handleJoin} disabled={!playerName.trim() || !user} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-5 rounded-2xl shadow-xl shadow-blue-100 transition-all active:scale-95 disabled:opacity-50 text-lg">
+                {!user ? 'מתחבר...' : 'הצטרפות למשחק'}
+              </button>
+            </div>
+          </div>
+        )}
 
-        // Configuration setup
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-            apiKey: "demo-key",
-            authDomain: "demo.firebaseapp.com",
-            projectId: "demo-project",
-            storageBucket: "demo.appspot.com",
-            messagingSenderId: "123",
-            appId: "123"
-        };
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'demo-quiz-app';
+        {/* LOBBY */}
+        {currentStep === 'lobby' && (
+          <div className="bg-white p-10 rounded-[2.5rem] shadow-xl border border-slate-100 text-center mt-10 animate-slide">
+            <h2 className="text-3xl font-black mb-8 text-slate-800">המשתתפים בחדר ({players.length})</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
+              {players.map((p) => (
+                <div key={p.id} className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
+                   <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2 font-black text-blue-600 text-xl">
+                     {String(p.name || '?')[0]}
+                   </div>
+                   <span className="font-bold text-slate-700 truncate block">{String(p.name || 'שחקן')}</span>
+                </div>
+              ))}
+            </div>
+            <button onClick={startQuiz} className="bg-green-600 hover:bg-green-700 text-white font-black px-16 py-5 rounded-2xl shadow-xl transition-all hover:scale-105 active:scale-95 text-xl">התחל חידון!</button>
+          </div>
+        )}
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        {/* QUIZ */}
+        {currentStep === 'quiz' && dynamicQuestions[questionIndex] && (
+          <div className="space-y-6 animate-slide">
+            <div className="bg-white p-8 rounded-[2rem] shadow-lg border border-slate-100">
+              <span className="text-blue-600 font-black text-sm uppercase block mb-2">שאלה {questionIndex + 1} מתוך {dynamicQuestions.length}</span>
+              <h2 className="text-2xl md:text-3xl font-black text-slate-800 leading-tight">{dynamicQuestions[questionIndex].question}</h2>
+              {dynamicQuestions[questionIndex].hint && (
+                <div className="mt-3 flex items-center gap-2 text-indigo-600 font-bold bg-indigo-50 py-2 px-4 rounded-xl inline-flex"><CheckCircle2 size={18} />{dynamicQuestions[questionIndex].hint}</div>
+              )}
+            </div>
 
-        // Paths rules
-        const playersPath = () => collection(db, 'artifacts', appId, 'public', 'data', 'players');
-        const settingsDocPath = () => doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'game_state');
-        const questionsDocPath = () => doc(db, 'artifacts', appId, 'public', 'data', 'questions', 'all_questions');
-
-        // UI Elements
-        const screens = {
-            login: document.getElementById('screen-login'),
-            lobby: document.getElementById('screen-lobby'),
-            game: document.getElementById('screen-game'),
-            leaderboard: document.getElementById('screen-leaderboard'),
-            adminLogin: document.getElementById('screen-admin-login'),
-            adminDashboard: document.getElementById('screen-admin-dashboard')
-        };
-
-        function showScreen(screenName) {
-            Object.values(screens).forEach(s => s.classList.add('hidden'));
-            screens[screenName].classList.remove('hidden');
-        }
-
-        // Initialize App & Auth
-        async function init() {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (err) {
-                console.error("Auth Error:", err);
-            }
-
-            onAuthStateChanged(auth, async (user) => {
-                if (user) {
-                    currentUser = user;
-                    setupRealtimeListeners();
-                    await checkUserExists();
-                }
-            });
-        }
-
-        async function checkUserExists() {
-            if (!currentUser) return;
-            try {
-                const userDoc = await getDoc(doc(playersPath(), currentUser.uid));
-                if (userDoc.exists()) {
-                    const data = userDoc.data();
-                    myPlayerData = { ...data, completedStages: data.completedStages || [] };
-                    scoreCounter = myPlayerData.score || 0;
-                    document.getElementById('player-name-display').innerText = myPlayerData.name;
-                    showScreen('lobby');
-                    renderLobby();
-                } else {
-                    showScreen('login');
-                }
-            } catch (error) {
-                console.error("Error checking user:", error);
-                showScreen('login');
-            }
-        }
-
-        // Realtime Listeners
-        function setupRealtimeListeners() {
-            if (!currentUser) return;
-
-            // Listen to Players (for Leaderboard & Self Data)
-            onSnapshot(playersPath(), (snap) => {
-                players = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
-                const me = players.find(p => p.uid === currentUser?.uid);
-                if (me) {
-                    myPlayerData = { ...me, completedStages: me.completedStages || [] };
-                }
-                renderLeaderboardUI();
-                if (!screens.lobby.classList.contains('hidden')) {
-                    renderLobby();
-                }
-            }, (err) => console.error(err));
-
-            // Listen to Settings (Stage locks)
-            onSnapshot(settingsDocPath(), (docSnap) => {
-                if (docSnap.exists()) {
-                    settings = docSnap.data();
-                } else {
-                    // Seed default settings
-                    setDoc(settingsDocPath(), settings);
-                }
-                if (!screens.lobby.classList.contains('hidden')) {
-                    renderLobby();
-                }
-                renderAdminSettings();
-            }, (err) => console.error(err));
-
-            // Listen to Questions
-            onSnapshot(questionsDocPath(), (docSnap) => {
-                if (docSnap.exists()) {
-                    allQuestions = docSnap.data().questions || [];
-                } else {
-                    // Seed default questions
-                    seedDefaultQuestions();
-                }
-                renderAdminQuestions();
-            }, (err) => console.error(err));
-        }
-
-        async function seedDefaultQuestions() {
-            const defaultQs = [];
-            for (let s = 1; s <= 4; s++) {
-                for (let q = 1; q <= 5; q++) {
-                    defaultQs.push({
-                        id: `s${s}q${q}`,
-                        stage: s,
-                        text: `שאלה ${q} - שלב ${s} (ערוך אותי בהגדרות)`,
-                        options: ["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
-                        correctIndex: 0,
-                        timeLimit: 20
-                    });
-                }
-            }
-            await setDoc(questionsDocPath(), { questions: defaultQs });
-        }
-
-        // --- User Actions ---
-
-        window.joinGame = async () => {
-            const nameInput = document.getElementById('player-name').value.trim();
-            if (!nameInput) {
-                showMessage("אנא הזן שם כדי להמשיך", "error");
-                return;
-            }
-            if (!currentUser) return;
-
-            const playerData = {
-                name: nameInput,
-                score: 0,
-                joinedAt: Date.now(),
-                completedStages: []
-            };
-
-            myPlayerData = playerData;
-            await setDoc(doc(playersPath(), currentUser.uid), playerData);
-            scoreCounter = 0;
-            document.getElementById('player-name-display').innerText = nameInput;
-            showScreen('lobby');
-            renderLobby();
-        };
-
-        // --- Lobby Logic ---
-        
-        function renderLobby() {
-            for (let i = 1; i <= 4; i++) {
-                const btn = document.getElementById(`stage-btn-${i}`);
-                if (btn) {
-                    const isOpen = settings[`stage${i}`];
-                    const isCompleted = myPlayerData?.completedStages?.includes(i);
-                    const lockIcon = btn.querySelector('.lock-icon');
-                    const checkIcon = btn.querySelector('.check-icon');
-
-                    if (isCompleted) {
-                        btn.classList.add('opacity-40', 'cursor-not-allowed', 'border-green-500', 'bg-green-900/20');
-                        btn.classList.remove('hover:scale-105', 'shadow-lg');
-                        if (lockIcon) lockIcon.classList.add('hidden');
-                        if (checkIcon) checkIcon.classList.remove('hidden');
-                    } else if (isOpen) {
-                        btn.classList.remove('opacity-40', 'opacity-50', 'cursor-not-allowed', 'border-green-500', 'bg-green-900/20');
-                        btn.classList.add('hover:scale-105', 'shadow-lg');
-                        if (lockIcon) lockIcon.classList.add('hidden');
-                        if (checkIcon) checkIcon.classList.add('hidden');
-                    } else {
-                        btn.classList.add('opacity-50', 'cursor-not-allowed');
-                        btn.classList.remove('hover:scale-105', 'shadow-lg', 'border-green-500', 'bg-green-900/20');
-                        if (lockIcon) lockIcon.classList.remove('hidden');
-                        if (checkIcon) checkIcon.classList.add('hidden');
-                    }
-                }
-            }
-            document.getElementById('lobby-total-score').innerText = myPlayerData?.score || 0;
-        }
-
-        window.attemptStage = (stageNum) => {
-            if (myPlayerData?.completedStages?.includes(stageNum)) {
-                showMessage('כבר סיימת את השלב הזה!', 'success');
-                return;
-            }
-            if (!settings[`stage${stageNum}`]) {
-                showMessage('השלב הזה עדיין נעול, נתראה בקרוב!', 'warning');
-                return;
-            }
+            <div className="grid grid-cols-1 gap-4">
+              {dynamicQuestions[questionIndex].type === 'wordcloud' ? (
+                <div className="bg-white p-10 rounded-[2rem] shadow-lg border border-slate-100">
+                   <p className="text-slate-500 mb-6 text-lg">{dynamicQuestions[questionIndex].description}</p>
+                   <div className="flex gap-3">
+                    <input type="text" className="flex-1 p-5 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-blue-500 outline-none text-xl font-bold shadow-inner" placeholder="הקלידו כאן..." value={wordCloudInput} onChange={(e) => setWordCloudInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitAnswer()}/>
+                    <button onClick={submitAnswer} disabled={!wordCloudInput.trim()} className="bg-blue-600 text-white px-8 rounded-2xl hover:bg-blue-700 disabled:opacity-50 shadow-lg shadow-blue-100"><Send size={28} /></button>
+                   </div>
+                </div>
+              ) : (
+                dynamicQuestions[questionIndex].options.map((opt) => (
+                  <button key={opt.id} onClick={() => {
+                      if (dynamicQuestions[questionIndex].type === 'multiple') setSelectedOptions([opt.id]);
+                      else setSelectedOptions(prev => prev.includes(opt.id) ? prev.filter(x => x !== opt.id) : [...prev, opt.id]);
+                    }} className={`p-6 rounded-2xl border-2 text-right transition-all transform flex flex-row justify-between items-center group ${selectedOptions.includes(opt.id) ? 'bg-blue-50 border-blue-500 shadow-md -translate-y-1' : 'bg-white border-slate-100 hover:border-blue-300'}`}>
+                    <span className="text-lg md:text-xl font-bold text-slate-700 flex-1 leading-normal text-right">{opt.text}</span>
+                    <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors mr-4 ${selectedOptions.includes(opt.id) ? 'bg-blue-500 border-blue-500 text-white' : 'border-slate-300 bg-white'}`}>
+                      {selectedOptions.includes(opt.id) && (dynamicQuestions[questionIndex].type === 'multiple' ? <div className="w-3 h-3 bg-white rounded-full"></div> : "✓")}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
             
-            // Prepare Game
-            currentStageId = stageNum;
-            stageQuestions = allQuestions.filter(q => Number(q.stage) === stageNum);
-            if (stageQuestions.length === 0) {
-                showMessage("אין שאלות בשלב זה עדיין.", "warning");
-                return;
-            }
-            
-            currentQuestionIndex = 0;
-            showScreen('game');
-            loadQuestion();
-        };
+            {dynamicQuestions[questionIndex].type !== 'wordcloud' && (
+              <div className="pt-6 flex justify-end">
+                <button onClick={submitAnswer} disabled={selectedOptions.length === 0} className="bg-blue-600 hover:bg-blue-700 text-white font-black py-5 px-16 rounded-2xl shadow-xl text-xl transition-all active:scale-95 disabled:opacity-50">אישור ובדיקה</button>
+              </div>
+            )}
+          </div>
+        )}
 
-        // --- Game Logic ---
-        
-        function loadQuestion() {
-            clearInterval(timerInterval);
-            selectedAnswer = null;
-            const q = stageQuestions[currentQuestionIndex];
-            
-            document.getElementById('question-number').innerText = `שאלה ${currentQuestionIndex + 1} מתוך ${stageQuestions.length}`;
-            document.getElementById('question-text').innerText = q.text;
-            
-            const btnContainer = document.getElementById('options-container');
-            btnContainer.innerHTML = '';
-            
-            // Subtle Dark Mode colors
-            const colors = [
-                'bg-slate-800 border-2 border-rose-500/40 text-rose-200', 
-                'bg-slate-800 border-2 border-blue-500/40 text-blue-200', 
-                'bg-slate-800 border-2 border-amber-500/40 text-amber-200', 
-                'bg-slate-800 border-2 border-emerald-500/40 text-emerald-200'
-            ];
-            const hoverColors = [
-                'hover:bg-slate-700 hover:border-rose-400', 
-                'hover:bg-slate-700 hover:border-blue-400', 
-                'hover:bg-slate-700 hover:border-amber-400', 
-                'hover:bg-slate-700 hover:border-emerald-400'
-            ];
-            const shapes = ['▲', '◆', '●', '■'];
+        {/* FEEDBACK */}
+        {currentStep === 'feedback' && lastQuestionResult && (
+          <div className="text-center mt-20 animate-bounce-in">
+            {lastQuestionResult.type === 'wordcloud' ? (
+              <>
+                <div className="w-32 h-32 rounded-full mx-auto mb-8 flex items-center justify-center shadow-xl bg-blue-100 text-blue-600">
+                  <MessageSquare size={80} />
+                </div>
+                <h2 className="text-5xl font-black mb-4 text-blue-600">תודה על השיתוף!</h2>
+                <p className="text-xl text-slate-500 font-bold mb-10">בואו נראה מה החברים חושבים...</p>
+              </>
+            ) : (
+              <>
+                <div className={`w-32 h-32 rounded-full mx-auto mb-8 flex items-center justify-center shadow-xl ${lastQuestionResult.isCorrect ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                  {lastQuestionResult.isCorrect ? <CheckCircle2 size={80} /> : <XCircle size={80} />}
+                </div>
+                <h2 className={`text-5xl font-black mb-4 ${lastQuestionResult.isCorrect ? 'text-green-600' : 'text-red-600'}`}>
+                  {lastQuestionResult.isCorrect ? "כל הכבוד! צדקתם" : "לא נורא, טעות..."}
+                </h2>
+                <div className="bg-white p-6 rounded-3xl shadow-lg border border-slate-100 inline-block px-12">
+                   <p className="text-slate-400 font-bold uppercase tracking-widest text-sm mb-1">ניקוד שנוסף</p>
+                   <p className="text-5xl font-black text-blue-600">+{lastQuestionResult.points}</p>
+                </div>
+              </>
+            )}
+            <div className="mt-12">
+              <button onClick={nextFromFeedback} className="bg-slate-900 text-white font-black py-4 px-16 rounded-2xl shadow-xl hover:bg-slate-800 transition-all transform hover:scale-105">לתוצאות השאלה</button>
+            </div>
+          </div>
+        )}
 
-            q.options.forEach((optText, index) => {
-                const btn = document.createElement('button');
-                btn.className = `w-full h-24 md:h-32 rounded-lg shadow-md flex items-center justify-between px-6 text-xl md:text-2xl font-bold transition-transform transform hover:scale-[1.02] ${colors[index]} ${hoverColors[index]}`;
-                btn.innerHTML = `<span>${optText}</span><span class="text-3xl opacity-50">${shapes[index]}</span>`;
-                btn.onclick = () => handleAnswer(index, q.correctIndex);
-                btnContainer.appendChild(btn);
-            });
+        {/* LEADERBOARD & STATS */}
+        {currentStep === 'leaderboard' && dynamicQuestions[questionIndex] && (
+          <div className="space-y-8 animate-slide">
+            <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-4"><Trophy className="text-amber-500" size={32} /><h2 className="text-2xl font-black text-slate-800">5 המובילים</h2></div>
+                <button onClick={nextQuestion} className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black flex items-center gap-2 hover:gap-4 transition-all">לשאלה הבאה <ChevronRight size={20} /></button>
+              </div>
+              <div className="space-y-4">
+                {leaderboard.map((p, idx) => (
+                  <div key={p.id} className={`flex items-center justify-between p-5 rounded-2xl border ${p.id === user?.uid ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}>
+                    <div className="flex items-center gap-4">
+                      <span className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-lg ${idx === 0 ? 'bg-amber-400 text-white shadow-lg shadow-amber-100' : idx === 1 ? 'bg-slate-300 text-white' : idx === 2 ? 'bg-orange-300 text-white' : 'bg-slate-200 text-slate-500'}`}>{idx + 1}</span>
+                      <span className="font-black text-xl text-slate-700">{String(p.name || 'שחקן')}</span>
+                    </div>
+                    <div className="text-left"><div className="text-[10px] text-slate-400 font-black uppercase">ניקוד</div><div className="text-2xl font-black text-blue-600">{Number(p.score || 0)}</div></div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-            // Start Timer
-            timeLeft = q.timeLimit || 20;
-            document.getElementById('timer-bar').classList.replace('bg-red-500', 'bg-indigo-500');
-            updateTimerUI();
-            
-            timerInterval = setInterval(() => {
-                timeLeft--;
-                updateTimerUI();
-                if (timeLeft <= 0) {
-                    clearInterval(timerInterval);
-                    handleAnswer(-1, q.correctIndex); // Time out
-                }
-            }, 1000);
-        }
+            <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100">
+               <h3 className="text-2xl font-black text-slate-800 mb-10 flex items-center gap-2"><BarChart2 className="text-blue-500" /> פילוח תשובות בזמן אמת</h3>
+               <div className="h-[450px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={getQuestionStats(dynamicQuestions[questionIndex].id)} margin={{ top: 20, right: 30, left: 20, bottom: 120 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="name" interval={0} angle={-45} textAnchor="end" height={100} tick={{ fontSize: 13, fontWeight: 'bold', fill: '#475569' }} />
+                      <YAxis hide />
+                      <Tooltip content={({ active, payload }) => active && payload?.[0] && (
+                        <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-2xl text-right max-w-xs" dir="rtl">
+                          <p className="font-bold text-sm mb-1">{String(payload[0].payload.fullName)}</p>
+                          <p className="text-blue-300 font-black">{Number(payload[0].value)} עונים</p>
+                        </div>
+                      )} />
+                      <Bar dataKey="count" radius={[10, 10, 0, 0]} barSize={50}>
+                        {getQuestionStats(dynamicQuestions[questionIndex].id).map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.isCorrect ? '#10b981' : '#cbd5e1'} />
+                        ))}
+                        <LabelList dataKey="count" position="top" style={{ fill: '#3b82f6', fontWeight: '900', fontSize: 16 }} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+               </div>
+            </div>
+          </div>
+        )}
 
-        function updateTimerUI() {
-            document.getElementById('timer-text').innerText = timeLeft;
-            const q = stageQuestions[currentQuestionIndex];
-            const maxTime = q.timeLimit || 20;
-            const percentage = (timeLeft / maxTime) * 100;
-            const bar = document.getElementById('timer-bar');
-            bar.style.width = `${percentage}%`;
-            
-            if (percentage < 30) {
-                bar.classList.replace('bg-indigo-500', 'bg-red-500');
-            } else {
-                bar.classList.replace('bg-red-500', 'bg-indigo-500');
-            }
-        }
+        {/* ADMIN PANEL */}
+        {currentStep === 'admin_login' && (
+          <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl border border-slate-100 text-center max-w-sm mx-auto mt-20 animate-slide">
+            <Settings className="mx-auto mb-6 text-slate-400" size={48} />
+            <h2 className="text-2xl font-black mb-6">כניסת מנהל</h2>
+            <input type="password" placeholder="סיסמה..." className="w-full p-4 rounded-xl border-2 border-slate-100 mb-4 text-center font-bold outline-none focus:border-blue-500" value={adminPass} onChange={(e) => setAdminPass(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && checkAdminLogin()} autoFocus />
+            <button onClick={checkAdminLogin} className="w-full bg-slate-900 text-white p-4 rounded-xl font-bold hover:bg-slate-800 transition-colors">כניסה</button>
+          </div>
+        )}
 
-        async function handleAnswer(selectedIndex, correctIndex) {
-            clearInterval(timerInterval);
-            const isCorrect = selectedIndex === correctIndex;
-            
-            // Visual feedback
-            const buttons = document.getElementById('options-container').children;
-            for (let i = 0; i < buttons.length; i++) {
-                buttons[i].disabled = true;
-                if (i === correctIndex) {
-                    buttons[i].classList.add('ring-4', 'ring-white', 'scale-[1.02]');
-                } else {
-                    buttons[i].classList.add('opacity-30');
-                }
-            }
+        {currentStep === 'admin_panel' && (
+          <div className="space-y-6 animate-slide">
+            <div className="flex justify-between items-center bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+              <h2 className="text-3xl font-black text-slate-800 flex items-center gap-3"><Settings size={30} /> עריכת שאלות</h2>
+              <div className="flex gap-2">
+                <button onClick={() => saveQuestions(dynamicQuestions)} className="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-blue-700 transition-colors"><Save size={18}/> שמור הכל</button>
+                <button onClick={() => setCurrentStep('login')} className="bg-slate-100 text-slate-600 px-6 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-200 transition-colors"><LogOut size={18}/> יציאה</button>
+              </div>
+            </div>
 
-            // Calculate Score: 1000 base + (timeLeft * 50)
-            if (isCorrect) {
-                const pointsEarned = 1000 + (timeLeft * 50);
-                scoreCounter += pointsEarned;
-                document.getElementById('feedback-message').innerText = `+${pointsEarned} נקודות!`;
-                document.getElementById('feedback-message').className = "text-4xl font-black text-white bg-green-600 rounded-lg p-4 animate-bounce absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 shadow-2xl z-50";
-            } else {
-                document.getElementById('feedback-message').innerText = selectedIndex === -1 ? "נגמר הזמן!" : "טעות!";
-                document.getElementById('feedback-message').className = "text-4xl font-black text-white bg-red-600 rounded-lg p-4 animate-pulse absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 shadow-2xl z-50";
-            }
-            
-            document.getElementById('feedback-message').classList.remove('hidden');
-
-            // Save score to Firestore immediately
-            if (currentUser) {
-                await updateDoc(doc(playersPath(), currentUser.uid), {
-                    score: scoreCounter
-                });
-            }
-
-            setTimeout(() => {
-                document.getElementById('feedback-message').classList.add('hidden');
-                showScreen('leaderboard');
-                renderLeaderboardUI();
-            }, 2500);
-        }
-
-        window.nextAction = async () => {
-            currentQuestionIndex++;
-            if (currentQuestionIndex < stageQuestions.length) {
-                showScreen('game');
-                loadQuestion();
-            } else {
-                // Stage Finished! Add to completed stages
-                if (currentUser && !myPlayerData.completedStages.includes(currentStageId)) {
-                    myPlayerData.completedStages.push(currentStageId);
-                    await updateDoc(doc(playersPath(), currentUser.uid), {
-                        completedStages: myPlayerData.completedStages
-                    });
-                }
-                
-                showMessage(`סיימת את שלב ${currentStageId}! כל הכבוד.`, 'success');
-                showScreen('lobby');
-                renderLobby();
-            }
-        };
-
-        window.backToLobby = () => {
-            clearInterval(timerInterval);
-            showScreen('lobby');
-            renderLobby();
-        }
-
-        // --- Leaderboard Logic ---
-        function renderLeaderboardUI() {
-            // Sort players in memory
-            const sorted = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
-            const top5 = sorted.slice(0, 5);
-            
-            const tbody = document.getElementById('leaderboard-body');
-            tbody.innerHTML = '';
-            
-            top5.forEach((p, index) => {
-                const tr = document.createElement('tr');
-                tr.className = index === 0 ? "bg-indigo-900/30 font-bold" : "border-b border-gray-700";
-                
-                let medal = `${index + 1}`;
-                if (index === 0) medal = '🥇';
-                if (index === 1) medal = '🥈';
-                if (index === 2) medal = '🥉';
-
-                tr.innerHTML = `
-                    <td class="py-3 px-4 text-center text-xl">${medal}</td>
-                    <td class="py-3 px-4 text-lg text-gray-200">${p.name}</td>
-                    <td class="py-3 px-4 text-left font-mono text-xl text-indigo-400">${p.score}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-
-            // Update user position
-            const myRank = sorted.findIndex(p => p.uid === currentUser?.uid) + 1;
-            document.getElementById('my-current-score').innerText = scoreCounter;
-            document.getElementById('my-current-rank').innerText = myRank > 0 ? myRank : '-';
-
-            // Button Logic
-            const nextBtn = document.getElementById('btn-next-question');
-            if (screens.game.classList.contains('hidden') && !screens.leaderboard.classList.contains('hidden')) {
-                if (currentQuestionIndex < stageQuestions.length - 1) {
-                    nextBtn.innerText = "שאלה הבאה";
-                } else {
-                    nextBtn.innerText = "חזור ללובי";
-                }
-            }
-        }
-
-        // --- Admin Logic ---
-        window.openAdminLogin = () => {
-            showScreen('adminLogin');
-        };
-
-        window.loginAdmin = () => {
-            const pwd = document.getElementById('admin-password').value;
-            if (pwd === "admin123" || pwd === "1234") {
-                document.getElementById('admin-password').value = '';
-                showScreen('adminDashboard');
-                renderAdminSettings();
-                renderAdminQuestions();
-            } else {
-                showMessage("סיסמה שגויה", "error");
-            }
-        };
-
-        function renderAdminSettings() {
-            document.getElementById('toggle-s1').checked = settings.stage1;
-            document.getElementById('toggle-s2').checked = settings.stage2;
-            document.getElementById('toggle-s3').checked = settings.stage3;
-            document.getElementById('toggle-s4').checked = settings.stage4;
-        }
-
-        window.updateStageSetting = async (stageNum, isChecked) => {
-            if (!currentUser) return;
-            const newSettings = { ...settings, [`stage${stageNum}`]: isChecked };
-            await setDoc(settingsDocPath(), newSettings);
-            showMessage("הגדרות נשמרו", "success");
-        };
-
-        window.resetAllScores = async () => {
-            if (!confirm("האם אתה בטוח שברצונך לאפס את הניקוד לכל השחקנים? (לא יאפס שלבים שהושלמו)")) return;
-            if (!currentUser) return;
-
-            try {
-                const snap = await getDocs(playersPath());
-                const promises = snap.docs.map(d => updateDoc(doc(playersPath(), d.id), { score: 0 }));
-                await Promise.all(promises);
-                showMessage("התוצאות אופסו בהצלחה", "success");
-            } catch (err) {
-                console.error(err);
-                showMessage("שגיאה באיפוס התוצאות", "error");
-            }
-        };
-
-        function renderAdminQuestions() {
-            const container = document.getElementById('admin-questions-list');
-            container.innerHTML = '';
-            
-            // Group by stages
-            for (let s = 1; s <= 4; s++) {
-                const stageQs = allQuestions.filter(q => Number(q.stage) === s);
-                if (stageQs.length === 0) continue;
-
-                const stageHeader = document.createElement('h3');
-                stageHeader.className = "text-xl font-bold mt-6 mb-2 text-indigo-400 border-b border-gray-600 pb-2";
-                stageHeader.innerText = `שלב ${s}`;
-                container.appendChild(stageHeader);
-
-                stageQs.forEach((q, idx) => {
-                    const qCard = document.createElement('div');
-                    qCard.className = "bg-gray-700 p-4 rounded border border-gray-600 mb-4 shadow-sm";
+            {dynamicQuestions.map((q, qIdx) => (
+              <div key={q.id} className="bg-white p-8 rounded-[2rem] shadow-lg border-2 border-slate-50 space-y-4">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1 space-y-4">
+                    <div className="flex items-center gap-3">
+                      <label className="font-black text-slate-400 text-sm uppercase">שאלה {qIdx + 1}:</label>
+                      <span className="text-xs bg-slate-100 px-2 py-1 rounded-md text-slate-500 font-bold">{q.type === 'wordcloud' ? 'ענן מילים (ללא ניקוד)' : 'שאלת בחירה'}</span>
+                    </div>
+                    <textarea className="w-full p-4 bg-slate-50 border-none rounded-xl font-bold text-lg outline-none focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all" value={q.question} onChange={(e) => {
+                      const newList = [...dynamicQuestions];
+                      newList[qIdx].question = e.target.value;
+                      setDynamicQuestions(newList);
+                    }} />
                     
-                    qCard.innerHTML = `
-                        <div class="mb-2">
-                            <label class="block text-sm font-medium text-gray-300">שאלה ${idx + 1}</label>
-                            <input type="text" id="edit-q-${q.id}-text" value="${q.text}" class="mt-1 block w-full rounded-md bg-gray-600 border-gray-500 text-white shadow-sm p-2 border focus:border-indigo-400 focus:ring-indigo-400">
-                        </div>
-                        <div class="grid grid-cols-2 gap-2 mb-2">
-                            ${q.options.map((opt, oIdx) => `
-                                <div>
-                                    <label class="block text-xs text-gray-400">תשובה ${oIdx + 1}</label>
-                                    <input type="text" id="edit-q-${q.id}-opt${oIdx}" value="${opt}" class="mt-1 block w-full rounded-md bg-gray-600 border-gray-500 text-white shadow-sm p-1 border text-sm">
-                                </div>
-                            `).join('')}
-                        </div>
-                        <div class="flex justify-between items-center mt-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-300">תשובה נכונה</label>
-                                <select id="edit-q-${q.id}-correct" class="mt-1 block w-full rounded-md bg-gray-600 border-gray-500 text-white shadow-sm p-2 border">
-                                    <option value="0" ${q.correctIndex === 0 ? 'selected' : ''}>תשובה 1</option>
-                                    <option value="1" ${q.correctIndex === 1 ? 'selected' : ''}>תשובה 2</option>
-                                    <option value="2" ${q.correctIndex === 2 ? 'selected' : ''}>תשובה 3</option>
-                                    <option value="3" ${q.correctIndex === 3 ? 'selected' : ''}>תשובה 4</option>
-                                </select>
-                            </div>
-                            <button onclick="saveQuestion('${q.id}')" class="bg-indigo-600 text-white px-4 py-2 rounded shadow hover:bg-indigo-500 transition">שמור שאלה</button>
-                        </div>
-                    `;
-                    container.appendChild(qCard);
-                });
-            }
-        }
-
-        window.saveQuestion = async (qId) => {
-            const qIndex = allQuestions.findIndex(q => q.id === qId);
-            if (qIndex === -1) return;
-
-            const text = document.getElementById(`edit-q-${qId}-text`).value;
-            const options = [
-                document.getElementById(`edit-q-${qId}-opt0`).value,
-                document.getElementById(`edit-q-${qId}-opt1`).value,
-                document.getElementById(`edit-q-${qId}-opt2`).value,
-                document.getElementById(`edit-q-${qId}-opt3`).value
-            ];
-            const correctIndex = parseInt(document.getElementById(`edit-q-${qId}-correct`).value);
-
-            const updatedQuestions = [...allQuestions];
-            updatedQuestions[qIndex] = { ...updatedQuestions[qIndex], text, options, correctIndex };
-
-            await setDoc(questionsDocPath(), { questions: updatedQuestions });
-            showMessage("השאלה עודכנה בהצלחה!", "success");
-        };
-
-        // --- Utils ---
-        function showMessage(msg, type = 'info') {
-            const toast = document.getElementById('toast');
-            toast.innerText = msg;
-            toast.className = `fixed top-5 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full text-white font-bold shadow-xl transition-opacity duration-300 z-[100] ${
-                type === 'error' ? 'bg-red-500' : 
-                type === 'success' ? 'bg-green-500' : 
-                type === 'warning' ? 'bg-orange-500' : 'bg-blue-500'
-            }`;
-            toast.classList.remove('hidden', 'opacity-0');
-            
-            setTimeout(() => {
-                toast.classList.add('opacity-0');
-                setTimeout(() => toast.classList.add('hidden'), 300);
-            }, 3000);
-        }
-
-        // Boot
-        window.addEventListener('DOMContentLoaded', init);
-
-    </script>
-</head>
-<body class="bg-gray-900 text-gray-100 h-screen w-screen overflow-hidden font-sans">
-
-    <!-- Toast Messages -->
-    <div id="toast" class="hidden opacity-0"></div>
-
-    <!-- SCREEN: LOGIN -->
-    <div id="screen-login" class="h-full flex flex-col items-center justify-center bg-gray-900 p-4 relative">
-        <button onclick="openAdminLogin()" class="absolute top-4 left-4 text-gray-500 hover:text-gray-300">⚙️ מנהל</button>
-        
-        <div class="bg-gray-800 rounded-xl shadow-2xl p-8 w-full max-w-md text-center border border-gray-700 transform hover:scale-105 transition duration-300">
-            <h1 class="text-4xl font-black mb-2 text-indigo-400">טריוויה ארגונית</h1>
-            <p class="text-gray-400 mb-8">היכנסו והתחרו על המקום הראשון!</p>
-            
-            <input type="text" id="player-name" placeholder="הזן את שמך המלא" class="w-full text-center text-xl p-4 bg-gray-700 border-2 border-gray-600 rounded-lg mb-4 text-white focus:outline-none focus:border-indigo-400 font-bold transition">
-            <button onclick="joinGame()" class="w-full bg-indigo-600 text-white text-xl font-bold py-4 rounded-lg hover:bg-indigo-700 transition shadow-lg">היכנס למשחק</button>
-        </div>
-    </div>
-
-    <!-- SCREEN: LOBBY -->
-    <div id="screen-lobby" class="hidden h-full flex flex-col bg-gray-900">
-        <header class="bg-gray-800 shadow-sm p-4 flex justify-between items-center border-b border-gray-700">
-            <div class="font-bold text-xl text-gray-400">
-                שלום, <span id="player-name-display" class="text-gray-100"></span>
-            </div>
-            <div class="bg-indigo-900/50 border border-indigo-700 text-indigo-200 px-4 py-2 rounded-full font-bold shadow-inner">
-                ניקוד: <span id="lobby-total-score">0</span>
-            </div>
-        </header>
-
-        <main class="flex-1 p-6 flex flex-col items-center justify-center overflow-y-auto">
-            <h2 class="text-3xl font-black mb-8 text-gray-100">בחר שלב למשחק</h2>
-            
-            <div class="grid grid-cols-2 gap-4 md:gap-6 w-full max-w-2xl">
-                <!-- Stage 1 -->
-                <button id="stage-btn-1" onclick="attemptStage(1)" class="relative aspect-square rounded-2xl bg-slate-800 border-2 border-rose-500/30 text-rose-300 flex flex-col items-center justify-center p-4 transition-all duration-300 opacity-50 cursor-not-allowed group">
-                    <span class="lock-icon text-4xl mb-2 opacity-60">🔒</span>
-                    <span class="check-icon text-5xl mb-2 hidden drop-shadow-md">✅</span>
-                    <h3 class="text-2xl font-black group-hover:text-rose-200 transition">שלב 1</h3>
-                </button>
-                <!-- Stage 2 -->
-                <button id="stage-btn-2" onclick="attemptStage(2)" class="relative aspect-square rounded-2xl bg-slate-800 border-2 border-blue-500/30 text-blue-300 flex flex-col items-center justify-center p-4 transition-all duration-300 opacity-50 cursor-not-allowed group">
-                    <span class="lock-icon text-4xl mb-2 opacity-60">🔒</span>
-                    <span class="check-icon text-5xl mb-2 hidden drop-shadow-md">✅</span>
-                    <h3 class="text-2xl font-black group-hover:text-blue-200 transition">שלב 2</h3>
-                </button>
-                <!-- Stage 3 -->
-                <button id="stage-btn-3" onclick="attemptStage(3)" class="relative aspect-square rounded-2xl bg-slate-800 border-2 border-amber-500/30 text-amber-300 flex flex-col items-center justify-center p-4 transition-all duration-300 opacity-50 cursor-not-allowed group">
-                    <span class="lock-icon text-4xl mb-2 opacity-60">🔒</span>
-                    <span class="check-icon text-5xl mb-2 hidden drop-shadow-md">✅</span>
-                    <h3 class="text-2xl font-black group-hover:text-amber-200 transition">שלב 3</h3>
-                </button>
-                <!-- Stage 4 -->
-                <button id="stage-btn-4" onclick="attemptStage(4)" class="relative aspect-square rounded-2xl bg-slate-800 border-2 border-emerald-500/30 text-emerald-300 flex flex-col items-center justify-center p-4 transition-all duration-300 opacity-50 cursor-not-allowed group">
-                    <span class="lock-icon text-4xl mb-2 opacity-60">🔒</span>
-                    <span class="check-icon text-5xl mb-2 hidden drop-shadow-md">✅</span>
-                    <h3 class="text-2xl font-black group-hover:text-emerald-200 transition">שלב 4</h3>
-                </button>
-            </div>
-        </main>
-    </div>
-
-    <!-- SCREEN: GAME -->
-    <div id="screen-game" class="hidden h-full flex flex-col bg-gray-900 relative">
-        <div id="feedback-message" class="hidden"></div>
-        
-        <!-- Header -->
-        <header class="bg-gray-800 p-4 shadow-sm flex justify-between items-center z-10 border-b border-gray-700">
-            <div id="question-number" class="font-bold text-gray-400">שאלה 1 מתוך 5</div>
-            <div class="flex items-center gap-2 font-black text-2xl text-gray-100">
-                ⏱️ <span id="timer-text">20</span>
-            </div>
-            <button onclick="backToLobby()" class="text-sm text-gray-500 hover:text-gray-300 transition">יציאה</button>
-        </header>
-
-        <!-- Timer Bar -->
-        <div class="h-2 w-full bg-gray-700">
-            <div id="timer-bar" class="h-full bg-indigo-500 transition-all duration-1000 ease-linear" style="width: 100%;"></div>
-        </div>
-
-        <!-- Question -->
-        <div class="flex-1 p-6 flex items-center justify-center text-center">
-            <h2 id="question-text" class="text-3xl md:text-5xl font-black text-gray-100 leading-tight drop-shadow-lg">טוען שאלה...</h2>
-        </div>
-
-        <!-- Options -->
-        <div class="p-4 pb-8 w-full max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4" id="options-container">
-            <!-- Buttons injected by JS -->
-        </div>
-    </div>
-
-    <!-- SCREEN: LEADERBOARD -->
-    <div id="screen-leaderboard" class="hidden h-full flex flex-col bg-gray-900 relative">
-        <div class="flex-1 p-6 flex flex-col items-center justify-center w-full max-w-3xl mx-auto">
-            
-            <h2 class="text-4xl font-black mb-8 text-center text-gray-100 drop-shadow-lg">טבלת מובילים 🏆</h2>
-            
-            <div class="bg-gray-800 text-gray-200 w-full rounded-2xl shadow-2xl overflow-hidden mb-8 border border-gray-700">
-                <table class="w-full">
-                    <thead class="bg-gray-700 text-gray-400 border-b border-gray-600">
-                        <tr>
-                            <th class="py-3 px-4 w-16 text-center">מקום</th>
-                            <th class="py-3 px-4 text-right">שם השחקן</th>
-                            <th class="py-3 px-4 text-left w-24">ניקוד</th>
-                        </tr>
-                    </thead>
-                    <tbody id="leaderboard-body">
-                        <!-- Injected by JS -->
-                    </tbody>
-                </table>
-                <div class="bg-gray-800 p-4 border-t border-gray-700 flex justify-between items-center text-sm">
-                    <span class="font-bold text-gray-400">המיקום שלי: <span id="my-current-rank" class="text-indigo-400"></span></span>
-                    <span class="font-bold text-gray-400">הניקוד שלי: <span id="my-current-score" class="text-indigo-400"></span></span>
+                    {q.type !== 'wordcloud' && (
+                      <div className="space-y-2 mt-4">
+                        <label className="block font-bold text-slate-400 text-sm">אפשרויות ותשובה נכונה:</label>
+                        {q.options.map((opt, oIdx) => (
+                          <div key={opt.id} className="flex gap-2 items-center">
+                            <input type="text" className="flex-1 p-3 bg-slate-50 border-none rounded-lg font-medium outline-none" value={opt.text} onChange={(e) => {
+                              const newList = [...dynamicQuestions];
+                              newList[qIdx].options[oIdx].text = e.target.value;
+                              setDynamicQuestions(newList);
+                            }} />
+                            <button onClick={() => {
+                              const newList = [...dynamicQuestions];
+                              if (q.type === 'multiple') {
+                                newList[qIdx].options.forEach(o => o.correct = false);
+                                newList[qIdx].options[oIdx].correct = true;
+                              } else {
+                                newList[qIdx].options[oIdx].correct = !newList[qIdx].options[oIdx].correct;
+                              }
+                              setDynamicQuestions(newList);
+                            }} className={`px-4 py-2 rounded-lg font-bold transition-all ${opt.correct ? 'bg-green-600 text-white shadow-lg shadow-green-100' : 'bg-slate-100 text-slate-400'}`}>
+                              {opt.correct ? 'נכון' : 'לא נכון'}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button onClick={() => {
+                    const newList = dynamicQuestions.filter((_, idx) => idx !== qIdx);
+                    setDynamicQuestions(newList);
+                  }} className="text-red-400 p-2 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={20}/></button>
                 </div>
-            </div>
-
-            <button id="btn-next-question" onclick="nextAction()" class="bg-indigo-600 text-white px-10 py-4 rounded-full font-black text-xl hover:scale-105 hover:bg-indigo-500 transition transform shadow-lg">המשך</button>
-        </div>
-    </div>
-
-    <!-- SCREEN: ADMIN LOGIN -->
-    <div id="screen-admin-login" class="hidden h-full flex flex-col items-center justify-center bg-gray-900 p-4">
-        <div class="bg-gray-800 rounded-xl shadow-2xl p-8 w-full max-w-sm text-center border border-gray-700">
-            <h2 class="text-2xl font-black mb-6 text-gray-100">כניסת מנהל משחק</h2>
-            <input type="password" id="admin-password" placeholder="סיסמה (admin123)" class="w-full text-center p-3 bg-gray-700 border-gray-600 text-white rounded mb-4 focus:outline-none focus:border-indigo-400" onkeypress="if(event.key === 'Enter') loginAdmin()">
-            <button onclick="loginAdmin()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded hover:bg-indigo-700 transition">היכנס</button>
-            <button onclick="showScreen('login')" class="mt-4 text-sm text-gray-500 hover:text-gray-400 transition">חזור למסך הראשי</button>
-        </div>
-    </div>
-
-    <!-- SCREEN: ADMIN DASHBOARD -->
-    <div id="screen-admin-dashboard" class="hidden h-full flex flex-col bg-gray-900">
-        <header class="bg-gray-800 text-gray-100 p-4 flex justify-between items-center shadow-md border-b border-gray-700">
-            <h2 class="text-xl font-bold">פאנל ניהול ⚙️</h2>
-            <div class="flex gap-4">
-                <button onclick="resetAllScores()" class="bg-red-900 text-red-100 border border-red-700 hover:bg-red-800 px-3 py-1 rounded text-sm font-bold transition">איפוס כל התוצאות</button>
-                <button onclick="showScreen('login')" class="bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white px-3 py-1 rounded text-sm transition border border-gray-600">יציאה מניהול</button>
-            </div>
-        </header>
-
-        <main class="flex-1 p-6 overflow-y-auto max-w-5xl mx-auto w-full grid md:grid-cols-3 gap-6">
+              </div>
+            ))}
             
-            <!-- Controls -->
-            <div class="md:col-span-1 bg-gray-800 p-6 rounded-xl shadow border border-gray-700 h-fit text-gray-200">
-                <h3 class="text-lg font-bold mb-4 border-b border-gray-700 pb-2 text-indigo-400">שליטה בשלבים (זמן אמת)</h3>
-                <div class="space-y-4">
-                    <div class="flex items-center justify-between">
-                        <span class="font-medium">פתיחת שלב 1</span>
-                        <input type="checkbox" id="toggle-s1" class="w-5 h-5 accent-indigo-500" onchange="updateStageSetting(1, this.checked)">
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span class="font-medium">פתיחת שלב 2</span>
-                        <input type="checkbox" id="toggle-s2" class="w-5 h-5 accent-indigo-500" onchange="updateStageSetting(2, this.checked)">
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span class="font-medium">פתיחת שלב 3</span>
-                        <input type="checkbox" id="toggle-s3" class="w-5 h-5 accent-indigo-500" onchange="updateStageSetting(3, this.checked)">
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span class="font-medium">פתיחת שלב 4</span>
-                        <input type="checkbox" id="toggle-s4" class="w-5 h-5 accent-indigo-500" onchange="updateStageSetting(4, this.checked)">
-                    </div>
-                </div>
-                <div class="mt-6 text-sm text-indigo-300 bg-indigo-900/30 border border-indigo-800 p-3 rounded">
-                    השינויים נשמרים אוטומטית ומתעדכנים אצל כל השחקנים בזמן אמת.
-                </div>
-            </div>
+            <button onClick={() => {
+              const newQ = { id: Date.now(), type: 'multiple', question: 'שאלה חדשה', options: [{id: 'a', text: 'אופציה 1', correct: true}, {id: 'b', text: 'אופציה 2', correct: false}] };
+              setDynamicQuestions([...dynamicQuestions, newQ]);
+            }} className="w-full py-6 border-4 border-dashed border-slate-200 rounded-3xl text-slate-400 font-black flex items-center justify-center gap-3 hover:bg-white hover:border-blue-200 hover:text-blue-400 transition-all"><Plus /> הוסף שאלה למאגר</button>
+          </div>
+        )}
 
-            <!-- Content Editor -->
-            <div class="md:col-span-2 bg-gray-800 p-6 rounded-xl shadow border border-gray-700">
-                <h3 class="text-lg font-bold mb-4 border-b border-gray-700 pb-2 text-indigo-400">עורך שאלות</h3>
-                <div id="admin-questions-list" class="space-y-4">
-                    <p class="text-gray-500 text-center py-10">טוען שאלות מ-Firestore...</p>
+        {/* RESULTS */}
+        {currentStep === 'results' && (
+          <div className="text-center mt-10 animate-slide">
+            <Trophy size={100} className="text-amber-500 mx-auto mb-6 shadow-xl rounded-full p-4 bg-amber-50" />
+            <h2 className="text-5xl font-black mb-4 text-slate-800">החידון הסתיים!</h2>
+            <div className="bg-white p-8 rounded-[3rem] shadow-2xl border border-slate-100 max-w-2xl mx-auto">
+              {leaderboard.map((p, idx) => (
+                <div key={p.id} className={`flex items-center justify-between p-6 mb-4 rounded-3xl transition-all ${idx === 0 ? 'bg-blue-600 text-white shadow-xl -translate-y-2' : 'bg-slate-50 shadow-sm'}`}>
+                   <div className="flex items-center gap-6">
+                    <span className="text-3xl">{idx === 0 ? '🏆' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '✨'}</span>
+                    <div className="text-right">
+                      <div className="font-black text-2xl">{String(p.name || 'שחקן')}</div>
+                      <div className={`text-sm font-bold ${idx === 0 ? 'text-blue-100' : 'text-slate-400'}`}>אלופ/ת המשלחת</div>
+                    </div>
+                   </div>
+                   <div className={`text-4xl font-black ${idx === 0 ? 'text-white' : 'text-blue-600'}`}>{Number(p.score || 0)}</div>
                 </div>
+              ))}
             </div>
+            <button onClick={() => window.location.reload()} className="mt-10 bg-slate-900 text-white font-black py-5 px-16 rounded-2xl text-xl hover:scale-105 transition-all shadow-xl">משחק חדש</button>
+          </div>
+        )}
 
-        </main>
+      </main>
+
+      <footer className="py-8 text-center mt-20 bg-white border-t">
+        <div className="max-w-4xl mx-auto px-8 flex justify-between items-center text-slate-300 font-bold text-sm">
+          <span>משחק תדריך משלחת 2024</span>
+          <button onClick={() => setCurrentStep('admin_login')} className="hover:text-blue-500 transition-colors flex items-center gap-1 opacity-20 hover:opacity-100"><Settings size={14}/> ניהול שאלות</button>
+        </div>
+      </footer>
     </div>
-
-</body>
-</html>
+  );
+}
