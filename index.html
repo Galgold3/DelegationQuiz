@@ -9,13 +9,13 @@
     
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
     <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
-    
     <script src="https://unpkg.com/recharts@2.12.2/umd/Recharts.js"></script>
-    <script src="https://unpkg.com/lucide-react@0.344.0/dist/umd/lucide-react.js"></script>
+    
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.js"></script>
     
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -23,246 +23,121 @@
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap');
-        body { font-family: 'Heebo', sans-serif; overflow-x: hidden; }
-        @keyframes bounce-in { 0% { transform: scale(0.3); opacity: 0; } 50% { transform: scale(1.05); opacity: 1; } 70% { transform: scale(0.9); } 100% { transform: scale(1); } }
-        .animate-bounce-in { animation: bounce-in 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        body { font-family: 'Heebo', sans-serif; margin: 0; padding: 0; }
         .animate-slide { animation: slide-up 0.4s ease-out both; }
         @keyframes slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-900">
+<body class="bg-slate-50">
     <div id="root"></div>
 
     <script type="text/babel">
-        // גישה בטוחה לאובייקטים הגלובליים
-        const { 
-            BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList 
-        } = window.Recharts;
-        
-        const { 
-            Users, Trophy, ChevronRight, Send, BarChart2, Award, Clock, CheckCircle2, XCircle, Settings, Save, Plus, Trash2, LogOut, MessageSquare 
-        } = window.lucideReact;
-
-        const { useState, useEffect, useMemo } = React;
-
-        // Firebase Config
-        const firebaseConfig = {
-          apiKey: "AIzaSyD6YyQzuKAFfujfE5y-gyMsvja4yZ_nlS4",
-          authDomain: "delegationquizv.firebaseapp.com",
-          projectId: "delegationquizv",
-          storageBucket: "delegationquizv.firebasestorage.app",
-          messagingSenderId: "80236670656",
-          appId: "1:80236670656:web:632e8773af3bff79cc4725"
-        };
-
-        // אתחול Firebase רק אם לא אותחל כבר
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-        const appId = 'delegation-quiz-v5';
-
-        const QUESTIONS = [
-          { id: 1, type: 'wordcloud', question: "מהם הדברים שיש לוודא טרם הגעה לתדריך למשלחת?", description: "כתבו מילה או שתיים שחשוב לבדוק מראש" },
-          { id: 2, type: 'multiple', question: "היכן ניתן לראות את רמת האיום בכל מדינה?", options: [{ id: 'a', text: "א. באתר השגרירות" }, { id: 'b', text: "ב. מידע לא נגיש" }, { id: 'c', text: "ג. באתר המל\"ל", correct: true }, { id: 'd', text: "ד. בתקשורת" }] },
-          { id: 3, type: 'multiple_select', question: "איזה משפט הכי נכון?", hint: "יש יותר מתשובה אחת נכונה", options: [{ id: 'a', text: "א. תדריך אחיד" }, { id: 'b', text: "ב. להפחיד" }, { id: 'c', text: "ג. מדויק למשלחת", correct: true }, { id: 'd', text: "ד. מערב משתתפים", correct: true }] },
-          { id: 4, type: 'multiple', question: "האם הורים נחשבים מלווים?", options: [{ id: 'a', text: "א. כן, כמבוגר אחראי" }, { id: 'b', text: "ב. לא, למעט חריגים", correct: true }, { id: 'c', text: "ג. כן, באישור" }, { id: 'd', text: "ד. לא, לא היו בתדריך" }] },
-          { id: 5, type: 'multiple', question: "מה המפתח של מלווים למשלחת עצמאית?", options: [{ id: 'a', text: "א. מנהל + 1 לכל 15", correct: true }, { id: 'b', text: "ב. מנהל + 1 לכל 10" }, { id: 'c', text: "ג. מנהל + 1 לכל 20" }, { id: 'd', text: "ד. 1 לכל 15 ללא מנהל" }] }
-        ];
-
-        function App() {
-          const [user, setUser] = useState(null);
-          const [playerName, setPlayerName] = useState('');
-          const [currentStep, setCurrentStep] = useState('login'); 
-          const [questionIndex, setQuestionIndex] = useState(0);
-          const [selectedOptions, setSelectedOptions] = useState([]);
-          const [wordCloudInput, setWordCloudInput] = useState('');
-          const [startTime, setStartTime] = useState(null);
-          const [hasAnswered, setHasAnswered] = useState(false);
-          const [lastQuestionResult, setLastQuestionResult] = useState(null);
-          const [players, setPlayers] = useState([]);
-          const [dynamicQuestions, setDynamicQuestions] = useState(QUESTIONS);
-
-          useEffect(() => {
-            const unsubscribe = auth.onAuthStateChanged(async (u) => {
-              if (!u) {
-                  try {
-                      await auth.signInAnonymously();
-                  } catch (e) {
-                      console.error("Auth Error:", e);
-                  }
-              }
-              setUser(u);
-            });
-            return () => unsubscribe();
-          }, []);
-
-          useEffect(() => {
-            if (!user) return;
-            const dataPath = db.collection('artifacts').doc(appId).collection('public').doc('data');
+        // פונקציה שמחכה שכל הספריות יהיו זמינות
+        const initApp = () => {
+            const { useState, useEffect, useMemo } = React;
             
-            const unsubQuestions = dataPath.collection('config').doc('questions').onSnapshot(s => {
-              if (s.exists && s.data().list) setDynamicQuestions(s.data().list);
-            });
-            
-            const unsubPlayers = dataPath.collection('players').onSnapshot(s => {
-              setPlayers(s.docs.map(d => ({ id: d.id, ...d.data() })));
-            });
-            
-            return () => { unsubQuestions(); unsubPlayers(); };
-          }, [user]);
+            // הגנה: אם הספריות לא נטענו, נשתמש באובייקט ריק כדי למנוע קריסה
+            const rechartsObj = window.Recharts || {};
+            const lucideObj = window.lucideReact || window.Lucide || {};
 
-          const handleJoin = async () => {
-            if (!playerName.trim() || !user) return;
-            await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('players').doc(user.uid).set({
-              name: playerName, score: 0, totalTime: 0, lastActive: Date.now()
-            });
-            setCurrentStep('lobby');
-          };
+            const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } = rechartsObj;
+            const { Users, Trophy, ChevronRight, Send, BarChart2, Award, Clock, CheckCircle2, XCircle, Settings, Save, Plus, Trash2, LogOut, MessageSquare } = lucideObj;
 
-          const submitAnswer = async () => {
-            if (hasAnswered || !user) return;
-            const timeTaken = (Date.now() - (startTime || Date.now())) / 1000;
-            const q = dynamicQuestions[questionIndex];
-            let isCorrect = false;
-            
-            if (q.type === 'wordcloud') isCorrect = true;
-            else if (q.type === 'multiple') isCorrect = selectedOptions[0] === q.options.find(o => o.correct)?.id;
-            else if (q.type === 'multiple_select') isCorrect = q.options.filter(o => o.correct).map(o => o.id).sort().join(',') === [...selectedOptions].sort().join(',');
+            // Firebase Config
+            const firebaseConfig = {
+                apiKey: "AIzaSyD6YyQzuKAFfujfE5y-gyMsvja4yZ_nlS4",
+                authDomain: "delegationquizv.firebaseapp.com",
+                projectId: "delegationquizv",
+                storageBucket: "delegationquizv.firebasestorage.app",
+                messagingSenderId: "80236670656",
+                appId: "1:80236670656:web:632e8773af3bff79cc4725"
+            };
 
-            let points = 0;
-            if (isCorrect && q.type !== 'wordcloud') {
-              points = Math.max(100 - Math.floor(timeTaken), 50);
-              const p = players.find(p => p.id === user.uid);
-              await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('players').doc(user.uid).update({
-                score: (p?.score || 0) + points,
-                totalTime: (p?.totalTime || 0) + timeTaken
-              });
+            if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+            const auth = firebase.auth();
+            const db = firebase.firestore();
+            const appId = 'delegation-quiz-v5';
+
+            const QUESTIONS = [
+                { id: 1, type: 'wordcloud', question: "מהם הדברים שיש לוודא טרם הגעה לתדריך למשלחת?", description: "כתבו מילה או שתיים שחשוב לבדוק מראש" },
+                { id: 2, type: 'multiple', question: "היכן ניתן לראות את רמת האיום בכל מדינה?", options: [{ id: 'a', text: "א. באתר השגרירות" }, { id: 'b', text: "ב. מידע לא נגיש" }, { id: 'c', text: "ג. באתר המל\"ל", correct: true }, { id: 'd', text: "ד. בתקשורת" }] },
+                { id: 3, type: 'multiple_select', question: "איזה משפט הכי נכון?", options: [{ id: 'a', text: "א. תדריך אחיד" }, { id: 'b', text: "ב. להפחיד" }, { id: 'c', text: "ג. מדויק למשלחת", correct: true }, { id: 'd', text: "ד. מערב משתתפים", correct: true }] }
+            ];
+
+            function App() {
+                const [user, setUser] = useState(null);
+                const [playerName, setPlayerName] = useState('');
+                const [currentStep, setCurrentStep] = useState('login');
+                const [players, setPlayers] = useState([]);
+
+                useEffect(() => {
+                    const unsub = auth.onAuthStateChanged(async (u) => {
+                        if (!u) await auth.signInAnonymously();
+                        setUser(u);
+                    });
+                    return unsub;
+                }, []);
+
+                useEffect(() => {
+                    if (!user) return;
+                    return db.collection('artifacts').doc(appId).collection('public').doc('data').collection('players')
+                        .onSnapshot(s => setPlayers(s.docs.map(d => ({id: d.id, ...d.data()}))));
+                }, [user]);
+
+                const handleJoin = async () => {
+                    if (!playerName.trim()) return;
+                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('players').doc(user.uid).set({
+                        name: playerName, score: 0, lastActive: Date.now()
+                    });
+                    setCurrentStep('lobby');
+                };
+
+                return (
+                    <div className="min-h-screen flex flex-col items-center p-6" dir="rtl">
+                        <nav className="w-full max-w-4xl flex justify-between items-center mb-10 bg-white p-4 rounded-2xl shadow-sm border">
+                            <div className="flex items-center gap-2 font-black text-xl text-blue-600">
+                                {Award && <Award />} <span>תדריך משלחת</span>
+                            </div>
+                            {playerName && <div className="font-bold text-slate-600">{playerName}</div>}
+                        </nav>
+
+                        <div className="w-full max-w-md animate-slide">
+                            {currentStep === 'login' && (
+                                <div className="bg-white p-8 rounded-[2rem] shadow-xl border text-center">
+                                    {Users && <Users size={48} className="mx-auto text-blue-500 mb-4" />}
+                                    <h2 className="text-3xl font-black mb-6">ברוכים הבאים</h2>
+                                    <input 
+                                        type="text" 
+                                        className="w-full p-4 rounded-xl bg-slate-50 border-2 mb-4 text-center text-lg font-bold outline-none focus:border-blue-500" 
+                                        placeholder="מה השם שלך?" 
+                                        value={playerName} 
+                                        onChange={e => setPlayerName(e.target.value)} 
+                                    />
+                                    <button onClick={handleJoin} className="w-full bg-blue-600 text-white py-4 rounded-xl font-black text-lg shadow-lg">הצטרפות</button>
+                                </div>
+                            )}
+
+                            {currentStep === 'lobby' && (
+                                <div className="bg-white p-8 rounded-[2rem] shadow-xl border text-center">
+                                    <h2 className="text-2xl font-black mb-6">ממתינים למתחילים...</h2>
+                                    <div className="grid grid-cols-2 gap-2 mb-8">
+                                        {players.map(p => <div key={p.id} className="p-3 bg-slate-50 rounded-lg font-bold border">{p.name}</div>)}
+                                    </div>
+                                    <p className="text-slate-500">כבר מתחילים!</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
             }
 
-            await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('answers').add({
-              playerId: user.uid, playerName, questionId: q.id, answer: q.type === 'wordcloud' ? wordCloudInput : selectedOptions, isCorrect, timeTaken, timestamp: Date.now()
-            });
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(<App />);
+            console.log("🚀 System Ready: App Rendered");
+        };
 
-            setLastQuestionResult({ isCorrect, points });
-            setHasAnswered(true);
-            setCurrentStep('feedback');
-          };
-
-          const leaderboard = useMemo(() => [...players].sort((a,b) => (b.score||0)-(a.score||0)).slice(0,5), [players]);
-
-          return (
-            <div className="min-h-screen bg-slate-50 text-slate-900" dir="rtl">
-              <nav className="bg-white border-b px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="bg-blue-600 p-2 rounded-xl text-white"><Award size={24} /></div>
-                  <h1 className="text-xl font-black">משחק תדריך משלחת</h1>
-                </div>
-                {playerName && <div className="bg-blue-50 text-blue-700 px-4 py-1.5 rounded-full text-sm font-bold border border-blue-100">{playerName}</div>}
-              </nav>
-
-              <main className="max-w-4xl mx-auto p-4 md:p-8">
-                {currentStep === 'login' && (
-                  <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl text-center mt-10 border animate-slide">
-                    <Users className="text-blue-600 mx-auto mb-6" size={60} />
-                    <h2 className="text-4xl font-black mb-3 text-slate-800">ברוכים הבאים</h2>
-                    <p className="text-slate-500 mb-10 text-lg">הכנה למשלחות – בואו נראה מה אתם יודעים!</p>
-                    <input type="text" className="w-full px-8 py-5 rounded-2xl bg-slate-50 border-2 text-center text-xl font-bold outline-none focus:border-blue-500 shadow-inner" placeholder="הקלידו שם..." value={playerName} onChange={e => setPlayerName(e.target.value)} />
-                    <button onClick={handleJoin} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-5 rounded-2xl mt-4 text-lg shadow-xl transition-all active:scale-95">הצטרפות למשחק</button>
-                  </div>
-                )}
-
-                {currentStep === 'lobby' && (
-                  <div className="bg-white p-10 rounded-[2.5rem] shadow-xl text-center mt-10 border animate-slide">
-                    <h2 className="text-3xl font-black mb-8 text-slate-800">המשתתפים ({players.length})</h2>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
-                      {players.map(p => <div key={p.id} className="bg-slate-50 p-5 rounded-2xl border font-bold truncate">{p.name}</div>)}
-                    </div>
-                    <button onClick={() => { setQuestionIndex(0); setStartTime(Date.now()); setCurrentStep('quiz'); }} className="bg-green-600 text-white font-black px-16 py-5 rounded-2xl text-xl shadow-lg hover:bg-green-700">התחל חידון!</button>
-                  </div>
-                )}
-
-                {currentStep === 'quiz' && dynamicQuestions[questionIndex] && (
-                  <div className="space-y-6 animate-slide">
-                    <div className="bg-white p-8 rounded-[2rem] shadow-lg border">
-                      <h2 className="text-2xl md:text-3xl font-black">{dynamicQuestions[questionIndex].question}</h2>
-                    </div>
-                    <div className="grid gap-4">
-                      {dynamicQuestions[questionIndex].type === 'wordcloud' ? (
-                        <div className="flex gap-3 bg-white p-8 rounded-[2rem] border">
-                          <input type="text" className="flex-1 p-5 rounded-2xl bg-slate-50 border-2 text-xl font-bold outline-none focus:border-blue-500" value={wordCloudInput} onChange={e => setWordCloudInput(e.target.value)} placeholder="הקלידו תשובה..." />
-                          <button onClick={submitAnswer} className="bg-blue-600 text-white px-8 rounded-2xl flex items-center justify-center hover:bg-blue-700 transition-colors"><Send /></button>
-                        </div>
-                      ) : (
-                        dynamicQuestions[questionIndex].options.map(opt => (
-                          <button key={opt.id} onClick={() => dynamicQuestions[questionIndex].type === 'multiple' ? setSelectedOptions([opt.id]) : setSelectedOptions(prev => prev.includes(opt.id) ? prev.filter(x => x !== opt.id) : [...prev, opt.id])} className={`p-6 rounded-2xl border-2 text-right font-bold transition-all ${selectedOptions.includes(opt.id) ? 'border-blue-500 bg-blue-50 shadow-md' : 'bg-white border-slate-100 hover:border-slate-200'}`}>
-                            {opt.text}
-                          </button>
-                        ))
-                      )}
-                    </div>
-                    {dynamicQuestions[questionIndex].type !== 'wordcloud' && <button onClick={submitAnswer} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-xl shadow-lg hover:bg-blue-700 transition-all active:scale-95">אישור</button>}
-                  </div>
-                )}
-
-                {currentStep === 'feedback' && (
-                  <div className="text-center mt-20 animate-bounce-in">
-                    <div className={`mx-auto w-24 h-24 rounded-full flex items-center justify-center mb-6 ${lastQuestionResult?.isCorrect ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                        {lastQuestionResult?.isCorrect ? <CheckCircle2 size={48} /> : <XCircle size={48} />}
-                    </div>
-                    <h2 className="text-5xl font-black mb-4">{lastQuestionResult?.isCorrect ? "כל הכבוד!" : "טעות..."}</h2>
-                    <p className="text-xl text-slate-600 mb-12">צברת {lastQuestionResult?.points || 0} נקודות</p>
-                    <button onClick={() => setCurrentStep('leaderboard')} className="bg-slate-900 text-white py-4 px-16 rounded-2xl text-xl font-bold shadow-xl hover:bg-slate-800 transition-all">לתוצאות</button>
-                  </div>
-                )}
-
-                {currentStep === 'leaderboard' && (
-                  <div className="space-y-8 animate-slide">
-                    <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl border">
-                      <h2 className="text-2xl font-black mb-8 flex items-center gap-2 text-slate-800"><BarChart2 className="text-blue-600" /> טבלת מובילים</h2>
-                      <div className="space-y-3">
-                          {leaderboard.map((p, i) => (
-                              <div key={p.id} className={`flex justify-between p-5 rounded-2xl font-bold border ${p.id === user.uid ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}>
-                                  <div className="flex gap-4 items-center">
-                                      <span className="text-slate-400 w-6">{i+1}.</span>
-                                      <span>{p.name}</span>
-                                  </div>
-                                  <span className="text-blue-600">{p.score} נק'</span>
-                              </div>
-                          ))}
-                      </div>
-                      <button onClick={() => { 
-                          if(questionIndex < dynamicQuestions.length - 1) { 
-                              setQuestionIndex(q => q+1); 
-                              setSelectedOptions([]); 
-                              setHasAnswered(false); 
-                              setStartTime(Date.now()); 
-                              setWordCloudInput('');
-                              setCurrentStep('quiz'); 
-                          } else setCurrentStep('results'); 
-                      }} className="w-full bg-blue-600 text-white py-5 rounded-2xl mt-10 font-black text-lg shadow-lg hover:bg-blue-700 transition-all">
-                          {questionIndex < dynamicQuestions.length - 1 ? "לשאלה הבאה" : "סיכום משחק"}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {currentStep === 'results' && (
-                  <div className="text-center mt-10 animate-slide">
-                    <Trophy size={120} className="text-amber-500 mx-auto mb-6" />
-                    <h2 className="text-5xl font-black mb-4">החידון הסתיים!</h2>
-                    <p className="text-2xl text-slate-600 mb-12">תודה על ההשתתפות בתדריך משלחת</p>
-                    <button onClick={() => window.location.reload()} className="bg-slate-900 text-white py-6 px-20 rounded-2xl text-xl font-black shadow-2xl hover:bg-slate-800 transition-all active:scale-95">משחק חדש</button>
-                  </div>
-                )}
-              </main>
-            </div>
-          );
-        }
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        // הפעלה רק כשהחלון מוכן
+        window.onload = initApp;
     </script>
 </body>
 </html>
