@@ -17,8 +17,20 @@ import {
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
 import { Users, Trophy, ChevronRight, Send, BarChart2, Award, Clock, CheckCircle2, XCircle, Settings, Save, Plus, Trash2, LogOut, MessageSquare } from 'lucide-react';
 
-// Firebase Configuration from environment
-const firebaseConfig = JSON.parse(__firebase_config);
+/**
+ * Firebase configuration - for local development/Vercel
+ */
+const firebaseConfig = typeof __firebase_config !== 'undefined' 
+  ? JSON.parse(__firebase_config) 
+  : {
+      apiKey: "",
+      authDomain: "",
+      projectId: "",
+      storageBucket: "",
+      messagingSenderId: "",
+      appId: ""
+    };
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -94,7 +106,7 @@ export default function App() {
   const [dynamicQuestions, setDynamicQuestions] = useState(DEFAULT_QUESTIONS);
   const [adminPass, setAdminPass] = useState('');
 
-  // 1. Core Actions
+  // Hoisted Actions
   const startQuiz = () => {
     setQuestionIndex(0);
     setCurrentStep('quiz');
@@ -119,7 +131,7 @@ export default function App() {
     }
   };
 
-  // 2. Auth & Sync
+  // Auth & Sync
   useEffect(() => {
     const initAuth = async () => {
       if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -140,7 +152,7 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
 
-    // Sync Questions
+    // Sync Questions (Dynamic from Firestore)
     const questionsDoc = doc(db, 'artifacts', appId, 'public', 'data', 'config', 'questions');
     const unsubQuestions = onSnapshot(questionsDoc, (docSnap) => {
       if (docSnap.exists()) {
@@ -199,7 +211,7 @@ export default function App() {
       isCorrect = correctIds === selectedIds;
     }
 
-    // Scoring (SKIP Wordcloud)
+    // Scoring (SKIP Wordcloud points)
     let pointsEarned = 0;
     if (isCorrect && currentQ.type !== 'wordcloud') {
       pointsEarned = Math.max(100 - Math.floor(timeTaken), 50);
@@ -212,7 +224,7 @@ export default function App() {
       });
     }
 
-    // Save individual record
+    // Save individual answer for charts
     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'answers'), {
       playerId: user.uid,
       playerName: String(playerName),
@@ -228,25 +240,36 @@ export default function App() {
     setCurrentStep('feedback');
   };
 
-  // 3. Helpers
+  // Memoized calculations for UI
   const leaderboard = useMemo(() => {
     return [...players]
       .sort((a, b) => (b.score || 0) - (a.score || 0) || (a.totalTime || 0) - (b.totalTime || 0))
       .slice(0, 5);
   }, [players]);
 
-  const wordCloudData = useMemo(() => {
-    const q1Answers = answers.filter(a => a.questionId === dynamicQuestions[0]?.id);
+  const currentWordCloudData = useMemo(() => {
+    const currentQId = dynamicQuestions[questionIndex]?.id;
+    const relevantAnswers = answers.filter(a => a.questionId === currentQId);
     const wordFreq = {};
-    q1Answers.forEach(ans => {
+    
+    relevantAnswers.forEach(ans => {
       if (typeof ans.answer === 'string') {
-        ans.answer.split(/[\s,]+/).filter(w => w.length > 1).forEach(w => {
-          wordFreq[w] = (wordFreq[w] || 0) + 1;
+        // Split by space, comma, or punctuation
+        const words = ans.answer.split(/[\s,.;]+/).filter(w => w.length > 1);
+        words.forEach(w => {
+          const cleanWord = w.trim();
+          if (cleanWord) {
+            wordFreq[cleanWord] = (wordFreq[cleanWord] || 0) + 1;
+          }
         });
       }
     });
-    return Object.entries(wordFreq).map(([text, value]) => ({ text, value }));
-  }, [answers, dynamicQuestions]);
+    
+    // Sort and map to Recharts-friendly or cloud-friendly format
+    return Object.entries(wordFreq)
+      .map(([text, value]) => ({ text, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [answers, dynamicQuestions, questionIndex]);
 
   const getQuestionStats = (qId) => {
     const q = dynamicQuestions.find(qi => qi.id === qId);
@@ -317,7 +340,7 @@ export default function App() {
                 value={playerName} onChange={(e) => setPlayerName(e.target.value)}
               />
               <button onClick={handleJoin} disabled={!playerName.trim() || !user} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-5 rounded-2xl shadow-xl shadow-blue-100 transition-all active:scale-95 disabled:opacity-50 text-lg">
-                {!user ? 'מתחבר...' : 'הצטרפות למשחק'}
+                {!user ? 'מתחבר למערכת...' : 'הצטרפות למשחק'}
               </button>
             </div>
           </div>
@@ -333,7 +356,7 @@ export default function App() {
                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2 font-black text-blue-600 text-xl">
                      {String(p.name || '?')[0]}
                    </div>
-                   <span className="font-bold text-slate-700 truncate block">{String(p.name || 'שחקן')}</span>
+                   <span className="font-bold text-slate-700 truncate block text-center">{String(p.name || 'שחקן')}</span>
                 </div>
               ))}
             </div>
@@ -393,7 +416,7 @@ export default function App() {
                   <MessageSquare size={80} />
                 </div>
                 <h2 className="text-5xl font-black mb-4 text-blue-600">תודה על השיתוף!</h2>
-                <p className="text-xl text-slate-500 font-bold mb-10">בואו נראה מה החברים חושבים...</p>
+                <p className="text-xl text-slate-500 font-bold mb-10">בואו נראה מה המשלחת חושבת...</p>
               </>
             ) : (
               <>
@@ -430,40 +453,62 @@ export default function App() {
                       <span className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-lg ${idx === 0 ? 'bg-amber-400 text-white shadow-lg shadow-amber-100' : idx === 1 ? 'bg-slate-300 text-white' : idx === 2 ? 'bg-orange-300 text-white' : 'bg-slate-200 text-slate-500'}`}>{idx + 1}</span>
                       <span className="font-black text-xl text-slate-700">{String(p.name || 'שחקן')}</span>
                     </div>
-                    <div className="text-left"><div className="text-[10px] text-slate-400 font-black uppercase">ניקוד</div><div className="text-2xl font-black text-blue-600">{Number(p.score || 0)}</div></div>
+                    <div className="text-left"><div className="text-[10px] text-slate-400 font-black uppercase tracking-widest">ניקוד</div><div className="text-2xl font-black text-blue-600">{Number(p.score || 0)}</div></div>
                   </div>
                 ))}
               </div>
             </div>
 
             <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100">
-               <h3 className="text-2xl font-black text-slate-800 mb-10 flex items-center gap-2"><BarChart2 className="text-blue-500" /> פילוח תשובות בזמן אמת</h3>
-               <div className="h-[450px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={getQuestionStats(dynamicQuestions[questionIndex].id)} margin={{ top: 20, right: 30, left: 20, bottom: 120 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="name" interval={0} angle={-45} textAnchor="end" height={100} tick={{ fontSize: 13, fontWeight: 'bold', fill: '#475569' }} />
-                      <YAxis hide />
-                      <Tooltip content={({ active, payload }) => active && payload?.[0] && (
-                        <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-2xl text-right max-w-xs" dir="rtl">
-                          <p className="font-bold text-sm mb-1">{String(payload[0].payload.fullName)}</p>
-                          <p className="text-blue-300 font-black">{Number(payload[0].value)} עונים</p>
-                        </div>
-                      )} />
-                      <Bar dataKey="count" radius={[10, 10, 0, 0]} barSize={50}>
-                        {getQuestionStats(dynamicQuestions[questionIndex].id).map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.isCorrect ? '#10b981' : '#cbd5e1'} />
-                        ))}
-                        <LabelList dataKey="count" position="top" style={{ fill: '#3b82f6', fontWeight: '900', fontSize: 16 }} />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-               </div>
+               <h3 className="text-2xl font-black text-slate-800 mb-10 flex items-center gap-2"><BarChart2 className="text-blue-500" /> פילוח תשובות המשלחת</h3>
+               
+               {dynamicQuestions[questionIndex].type === 'wordcloud' ? (
+                 <div className="flex flex-wrap gap-4 justify-center items-center p-10 bg-slate-50 rounded-[2rem] min-h-[300px] border-2 border-dashed border-slate-200 overflow-hidden">
+                    {currentWordCloudData.length > 0 ? (
+                      currentWordCloudData.map((w, i) => (
+                        <span 
+                          key={i} 
+                          style={{ 
+                            fontSize: `${Math.min(1.2 + w.value * 0.7, 4.5)}rem`,
+                            opacity: Math.min(0.4 + w.value * 0.2, 1)
+                          }}
+                          className="font-black text-blue-600 transition-all hover:scale-110 cursor-default px-2"
+                        >
+                          {w.text}
+                        </span>
+                      ))
+                    ) : (
+                      <p className="text-slate-400 font-bold text-lg">מחכים למילים הראשונות...</p>
+                    )}
+                 </div>
+               ) : (
+                 <div className="h-[450px] w-full mt-4">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={getQuestionStats(dynamicQuestions[questionIndex].id)} margin={{ top: 20, right: 30, left: 20, bottom: 120 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis dataKey="name" interval={0} angle={-45} textAnchor="end" height={100} tick={{ fontSize: 13, fontWeight: 'bold', fill: '#475569' }} />
+                        <YAxis hide />
+                        <Tooltip content={({ active, payload }) => active && payload?.[0] && (
+                          <div className="bg-slate-900 text-white p-4 shadow-2xl rounded-2xl text-right max-w-xs" dir="rtl">
+                            <p className="font-bold text-sm mb-1">{String(payload[0].payload.fullName)}</p>
+                            <p className="text-blue-300 font-black">{Number(payload[0].value)} עונים</p>
+                          </div>
+                        )} />
+                        <Bar dataKey="count" radius={[10, 10, 0, 0]} barSize={50}>
+                          {getQuestionStats(dynamicQuestions[questionIndex].id).map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.isCorrect ? '#10b981' : '#cbd5e1'} />
+                          ))}
+                          <LabelList dataKey="count" position="top" style={{ fill: '#3b82f6', fontWeight: '900', fontSize: 16 }} />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                 </div>
+               )}
             </div>
           </div>
         )}
 
-        {/* ADMIN PANEL */}
+        {/* ADMIN LOGIN */}
         {currentStep === 'admin_login' && (
           <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl border border-slate-100 text-center max-w-sm mx-auto mt-20 animate-slide">
             <Settings className="mx-auto mb-6 text-slate-400" size={48} />
@@ -473,6 +518,7 @@ export default function App() {
           </div>
         )}
 
+        {/* ADMIN PANEL */}
         {currentStep === 'admin_panel' && (
           <div className="space-y-6 animate-slide">
             <div className="flex justify-between items-center bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
