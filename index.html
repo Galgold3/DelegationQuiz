@@ -26,9 +26,9 @@
     <div id="root"></div>
     <script type="text/babel">
         const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } = window.Recharts;
-        const { Users, Trophy, ChevronRight, Send, BarChart2, Award, Clock, CheckCircle2, XCircle, Settings, Save, Plus, Trash2, LogOut, MessageSquare } = lucide;
+        const { Users, Trophy, ChevronRight, Send, BarChart2, Award, CheckCircle2, XCircle, Settings, Save, Plus, Trash2, LogOut, MessageSquare } = lucide;
 
-        // --- ה-CONFIG שהעברת מהפיירבייס מוטמע כאן ---
+        // ה-Config שלך מוטמע כאן ישירות - לא צריך שום דבר ב-Vercel
         const firebaseConfig = {
           apiKey: "AIzaSyD6YyQzuKAFfujfE5y-gyMsvja4yZ_nlS4",
           authDomain: "delegationquizv.firebaseapp.com",
@@ -37,7 +37,6 @@
           messagingSenderId: "80236670656",
           appId: "1:80236670656:web:632e8773af3bff79cc4725"
         };
-        // ---------------------------------
 
         const app = firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
@@ -49,9 +48,9 @@
         const DEFAULT_QUESTIONS = [
           { id: 1, type: 'wordcloud', question: "מהם הדברים שיש לוודא טרם הגעה לתדריך למשלחת?", description: "כתבו מילה או שתיים שחשוב לבדוק מראש" },
           { id: 2, type: 'multiple', question: "היכן ניתן לראות את רמת האיום בכל מדינה?", options: [{ id: 'a', text: "א. באתר השגרירות" }, { id: 'b', text: "ב. זה לא מידע נגיש" }, { id: 'c', text: "ג. באתר המל\"ל", correct: true }, { id: 'd', text: "ד. בכלי התקשורת" }] },
-          { id: 3, type: 'multiple_select', question: "איזה משפט הכי נכון?", hint: "יש יותר מתשובה אחת נכונה", options: [{ id: 'a', text: "א. תדריך זהה לכולם" }, { id: 'b', text: "ב. צריך להפחיד" }, { id: 'c', text: "ג. מדויק למשלחת", correct: true }, { id: 'd', text: "ד. מערב משתתפים", correct: true }] },
+          { id: 3, type: 'multiple_select', question: "איזה משפט הכי נכון?", hint: "יש יותר מתשובה אחת נכונה", options: [{ id: 'a', text: "א. תדריך אחיד לכולם" }, { id: 'b', text: "ב. צריך להפחיד" }, { id: 'c', text: "ג. מותאם למשלחת", correct: true }, { id: 'd', text: "ד. מערב משתתפים", correct: true }] },
           { id: 4, type: 'multiple', question: "האם הורים נחשבים מלווים?", options: [{ id: 'a', text: "א. כן, כמבוגר אחראי" }, { id: 'b', text: "ב. לא, למעט חריגים (פולין)", correct: true }, { id: 'c', text: "ג. כן, באישור מנהל" }, { id: 'd', text: "ד. לא, כי לא היו בתדריך" }] },
-          { id: 5, type: 'multiple', question: "מה המפתח של מלווים למשלחת עצמאית?", options: [{ id: 'a', text: "א. מנהל + מלווה לכל 15", correct: true }, { id: 'b', text: "ב. מנהל + מלווה לכל 10" }, { id: 'c', text: "ג. מנהל + מלווה לכל 20" }, { id: 'd', text: "ד. מלווה לכל 15 ללא מנהל" }] }
+          { id: 5, type: 'multiple', question: "מה המפתח של מלווים מבוגרים למשלחת עצמאית?", options: [{ id: 'a', text: "א. מנהל + מלווה לכל 15 תלמידים", correct: true }, { id: 'b', text: "ב. מנהל + מלווה לכל 10" }, { id: 'c', text: "ג. מנהל + מלווה לכל 20" }, { id: 'd', text: "ד. מלווה לכל 15 ללא מנהל" }] }
         ];
 
         function App() {
@@ -71,7 +70,11 @@
 
           useEffect(() => {
             const unsubscribe = auth.onAuthStateChanged(async (u) => {
-              if (!u) await auth.signInAnonymously();
+              if (!u) {
+                  try {
+                    await auth.signInAnonymously();
+                  } catch (e) { console.error("Auth error", e); }
+              }
               setUser(u);
             });
             return () => unsubscribe();
@@ -79,124 +82,157 @@
 
           useEffect(() => {
             if (!user) return;
-            const unsubQuestions = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('config').doc('questions').onSnapshot(s => {
-              if (s.exists && s.data().list) setDynamicQuestions(s.data().list);
+            const unsubQuestions = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('config').doc('questions').onSnapshot((docSnap) => {
+              if (docSnap.exists) {
+                const data = docSnap.data();
+                if (data && data.list) setDynamicQuestions(data.list);
+              }
             });
-            const unsubPlayers = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('players').onSnapshot(s => {
-              setPlayers(s.docs.map(d => ({ id: d.id, ...d.data() })));
+            const unsubPlayers = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('players').onSnapshot((snapshot) => {
+              setPlayers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             });
-            const unsubAnswers = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('answers').onSnapshot(s => {
-              setAnswers(s.docs.map(d => ({ id: d.id, ...d.data() })));
+            const unsubAnswers = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('answers').onSnapshot((snapshot) => {
+              setAnswers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             });
             return () => { unsubQuestions(); unsubPlayers(); unsubAnswers(); };
           }, [user]);
 
           const handleJoin = async () => {
             if (!playerName.trim() || !user) return;
-            await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('players').doc(user.uid).set({
-              name: playerName, score: 0, totalTime: 0, lastActive: Date.now()
-            });
+            const playerRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('players').doc(user.uid);
+            await playerRef.set({ name: playerName, score: 0, totalTime: 0, lastActive: Date.now() });
             setCurrentStep('lobby');
           };
 
           const submitAnswer = async () => {
             if (hasAnswered || !user) return;
             const timeTaken = (Date.now() - (startTime || Date.now())) / 1000;
-            const q = dynamicQuestions[questionIndex];
+            const currentQ = dynamicQuestions[questionIndex];
             let isCorrect = false;
-            if (q.type === 'wordcloud') isCorrect = true;
-            else if (q.type === 'multiple') isCorrect = selectedOptions[0] === q.options.find(o => o.correct)?.id;
-            else if (q.type === 'multiple_select') isCorrect = q.options.filter(o => o.correct).map(o => o.id).sort().join(',') === [...selectedOptions].sort().join(',');
+
+            if (currentQ.type === 'wordcloud') {
+              isCorrect = true;
+            } else if (currentQ.type === 'multiple') {
+              isCorrect = selectedOptions[0] === currentQ.options.find(o => o.correct)?.id;
+            } else if (currentQ.type === 'multiple_select') {
+              const correctIds = currentQ.options.filter(o => o.correct).map(o => o.id).sort().join(',');
+              const selectedIds = [...selectedOptions].sort().join(',');
+              isCorrect = correctIds === selectedIds;
+            }
 
             let points = 0;
-            if (isCorrect && q.type !== 'wordcloud') {
+            if (isCorrect && currentQ.type !== 'wordcloud') {
               points = Math.max(100 - Math.floor(timeTaken), 50);
-              const p = players.find(p => p.id === user.uid);
-              await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('players').doc(user.uid).set({
-                ...p, score: (p?.score || 0) + points, totalTime: (p?.totalTime || 0) + timeTaken
-              });
+              const pRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('players').doc(user.uid);
+              const pData = players.find(p => p.id === user.uid);
+              await pRef.set({ ...pData, score: (pData?.score || 0) + points, totalTime: (pData?.totalTime || 0) + timeTaken });
             }
+
             await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('answers').add({
-              playerId: user.uid, playerName, questionId: q.id, answer: q.type === 'wordcloud' ? wordCloudInput : selectedOptions, isCorrect, timeTaken, timestamp: Date.now()
+              playerId: user.uid, playerName, questionId: currentQ.id, answer: currentQ.type === 'wordcloud' ? wordCloudInput : selectedOptions, isCorrect, timeTaken, timestamp: Date.now()
             });
-            setLastQuestionResult({ isCorrect, points, type: q.type });
+            setLastQuestionResult({ isCorrect, points, type: currentQ.type });
             setHasAnswered(true);
             setCurrentStep('feedback');
           };
 
-          const leaderboard = useMemo(() => [...players].sort((a,b) => (b.score||0)-(a.score||0) || (a.totalTime||0)-(b.totalTime||0)).slice(0,5), [players]);
+          const leaderboard = useMemo(() => [...players].sort((a, b) => (b.score || 0) - (a.score || 0) || (a.totalTime || 0) - (b.totalTime || 0)).slice(0, 5), [players]);
+
+          const getQuestionStats = (qId) => {
+            const q = dynamicQuestions.find(qi => qi.id === qId);
+            if (!q || q.type === 'wordcloud') return [];
+            const relevantAnswers = answers.filter(a => a.questionId === qId);
+            return q.options.map(opt => ({
+              name: opt.text.length > 12 ? opt.text.substring(0, 12) + '...' : opt.text,
+              count: relevantAnswers.filter(ans => Array.isArray(ans.answer) && ans.answer.includes(opt.id)).length,
+              isCorrect: opt.correct
+            }));
+          };
 
           return (
-            <div className="min-h-screen bg-slate-50 text-slate-900" dir="rtl">
+            <div className="min-h-screen bg-slate-50 text-slate-900 font-heebo" dir="rtl">
               <nav className="bg-white border-b px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
                 <div className="flex items-center gap-3">
                   <div className="bg-blue-600 p-2 rounded-xl text-white"><Award size={24} /></div>
-                  <h1 className="text-xl font-black">משחק תדריך משלחת</h1>
+                  <h1 className="text-xl font-black text-slate-800">משחק תדריך משלחת</h1>
                 </div>
-                {playerName && <div className="bg-blue-50 text-blue-700 px-4 py-1.5 rounded-full text-sm font-bold">{playerName}</div>}
+                {playerName && <div className="bg-blue-50 text-blue-700 px-4 py-1.5 rounded-full text-sm font-bold border border-blue-100">{playerName}</div>}
               </nav>
 
               <main className="max-w-4xl mx-auto p-4 md:p-8">
                 {currentStep === 'login' && (
-                  <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl text-center mt-10 border animate-slide">
+                  <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl border text-center mt-10 animate-slide">
                     <Users className="text-blue-600 mx-auto mb-6" size={60} />
-                    <h2 className="text-4xl font-black mb-3 text-slate-800">ברוכים הבאים</h2>
-                    <p className="text-slate-500 mb-10 text-lg">הכנה למשלחות – בואו נראה מה אתם יודעים!</p>
-                    <input type="text" className="w-full px-8 py-5 rounded-2xl bg-slate-50 border-2 text-center text-xl font-bold outline-none focus:border-blue-500" placeholder="הקלידו שם..." value={playerName} onChange={e => setPlayerName(e.target.value)} />
-                    <button onClick={handleJoin} className="w-full bg-blue-600 text-white font-black py-5 rounded-2xl mt-4 text-lg">הצטרפות למשחק</button>
+                    <h2 className="text-4xl font-black mb-3">ברוכים הבאים</h2>
+                    <input type="text" className="w-full px-8 py-5 rounded-2xl bg-slate-50 border-2 text-center text-xl font-bold outline-none focus:border-blue-500" placeholder="הקלידו שם..." value={playerName} onChange={(e) => setPlayerName(e.target.value)} />
+                    <button onClick={handleJoin} disabled={!playerName.trim() || !user} className="w-full bg-blue-600 text-white font-black py-5 rounded-2xl shadow-xl mt-4 text-lg transition-all active:scale-95">כניסה למשחק</button>
                   </div>
                 )}
+
                 {currentStep === 'lobby' && (
-                  <div className="bg-white p-10 rounded-[2.5rem] shadow-xl text-center mt-10 border animate-slide">
-                    <h2 className="text-3xl font-black mb-8 text-slate-800">המשתתפים ({players.length})</h2>
+                  <div className="bg-white p-10 rounded-[2.5rem] shadow-xl text-center mt-10 animate-slide">
+                    <h2 className="text-3xl font-black mb-8">המשתתפים ({players.length})</h2>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
-                      {players.map(p => <div key={p.id} className="bg-slate-50 p-5 rounded-2xl border font-bold">{p.name}</div>)}
+                      {players.map((p) => <div key={p.id} className="bg-slate-50 p-5 rounded-2xl border font-bold truncate">{p.name}</div>)}
                     </div>
-                    <button onClick={() => { setQuestionIndex(0); setStartTime(Date.now()); setCurrentStep('quiz'); }} className="bg-green-600 text-white font-black px-16 py-5 rounded-2xl text-xl">התחל חידון!</button>
+                    <button onClick={() => { setQuestionIndex(0); setStartTime(Date.now()); setCurrentStep('quiz'); }} className="bg-green-600 text-white font-black px-16 py-5 rounded-2xl text-xl shadow-lg transition-all active:scale-95">התחל חידון!</button>
                   </div>
                 )}
+
                 {currentStep === 'quiz' && dynamicQuestions[questionIndex] && (
                   <div className="space-y-6 animate-slide">
                     <div className="bg-white p-8 rounded-[2rem] shadow-lg border">
-                      <h2 className="text-2xl md:text-3xl font-black">{dynamicQuestions[questionIndex].question}</h2>
+                      <h2 className="text-2xl md:text-3xl font-black text-slate-800 leading-tight">{dynamicQuestions[questionIndex].question}</h2>
                     </div>
-                    <div className="grid gap-4">
+                    <div className="grid grid-cols-1 gap-4">
                       {dynamicQuestions[questionIndex].type === 'wordcloud' ? (
-                        <div className="flex gap-3 bg-white p-8 rounded-[2rem] border">
-                          <input type="text" className="flex-1 p-5 rounded-2xl bg-slate-50 border-2 text-xl font-bold" value={wordCloudInput} onChange={e => setWordCloudInput(e.target.value)} />
-                          <button onClick={submitAnswer} className="bg-blue-600 text-white px-8 rounded-2xl"><Send /></button>
+                        <div className="bg-white p-10 rounded-[2rem] shadow-lg border flex gap-3">
+                          <input type="text" className="flex-1 p-5 rounded-2xl bg-slate-50 border-2 text-xl font-bold outline-none" placeholder="הקלידו כאן..." value={wordCloudInput} onChange={(e) => setWordCloudInput(e.target.value)} />
+                          <button onClick={submitAnswer} className="bg-blue-600 text-white px-8 rounded-2xl shadow-lg"><Send size={28} /></button>
                         </div>
                       ) : (
-                        dynamicQuestions[questionIndex].options.map(opt => (
-                          <button key={opt.id} onClick={() => dynamicQuestions[questionIndex].type === 'multiple' ? setSelectedOptions([opt.id]) : setSelectedOptions(prev => prev.includes(opt.id) ? prev.filter(x => x !== opt.id) : [...prev, opt.id])} className={`p-6 rounded-2xl border-2 text-right font-bold ${selectedOptions.includes(opt.id) ? 'border-blue-500 bg-blue-50' : 'bg-white border-slate-100'}`}>
-                            {opt.text}
+                        dynamicQuestions[questionIndex].options.map((opt) => (
+                          <button key={opt.id} onClick={() => dynamicQuestions[questionIndex].type === 'multiple' ? setSelectedOptions([opt.id]) : setSelectedOptions(prev => prev.includes(opt.id) ? prev.filter(x => x !== opt.id) : [...prev, opt.id])} className={`p-6 rounded-2xl border-2 text-right transition-all transform ${selectedOptions.includes(opt.id) ? 'bg-blue-50 border-blue-500 shadow-md' : 'bg-white border-slate-100 hover:border-blue-200'}`}>
+                            <span className="text-lg md:text-xl font-bold text-slate-700">{opt.text}</span>
                           </button>
                         ))
                       )}
                     </div>
-                    {dynamicQuestions[questionIndex].type !== 'wordcloud' && <button onClick={submitAnswer} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-xl">אישור ובדיקה</button>}
+                    {dynamicQuestions[questionIndex].type !== 'wordcloud' && (
+                      <button onClick={submitAnswer} disabled={selectedOptions.length === 0} className="w-full bg-blue-600 text-white font-black py-5 rounded-2xl shadow-xl text-xl disabled:opacity-50 transition-all active:scale-95">אישור</button>
+                    )}
                   </div>
                 )}
+
                 {currentStep === 'feedback' && (
                   <div className="text-center mt-20 animate-bounce-in">
                     <h2 className={`text-5xl font-black ${lastQuestionResult?.isCorrect ? 'text-green-600' : 'text-red-600'}`}>{lastQuestionResult?.isCorrect ? "כל הכבוד!" : "לא נורא, טעות..."}</h2>
-                    <button onClick={() => setCurrentStep('leaderboard')} className="mt-12 bg-slate-900 text-white py-4 px-16 rounded-2xl">לתוצאות</button>
+                    <button onClick={() => setCurrentStep('leaderboard')} className="mt-12 bg-slate-900 text-white font-black py-4 px-16 rounded-2xl shadow-xl transition-all active:scale-95">לתוצאות</button>
                   </div>
                 )}
+
                 {currentStep === 'leaderboard' && (
                   <div className="space-y-8 animate-slide">
                     <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl border">
-                      <h2 className="text-2xl font-black mb-8">טבלת מובילים</h2>
-                      {leaderboard.map((p, i) => <div key={p.id} className="flex justify-between p-4 border-b font-bold"><span>{i+1}. {p.name}</span><span>{p.score}</span></div>)}
-                      <button onClick={() => { if(questionIndex < dynamicQuestions.length-1) { setQuestionIndex(q => q+1); setSelectedOptions([]); setHasAnswered(false); setStartTime(Date.now()); setCurrentStep('quiz'); } else setCurrentStep('results'); }} className="w-full bg-slate-900 text-white py-4 rounded-2xl mt-8">לשאלה הבאה</button>
+                      <h2 className="text-2xl font-black mb-8 flex items-center gap-4"><Trophy className="text-amber-500" /> 5 המובילים</h2>
+                      <div className="space-y-4">
+                        {leaderboard.map((p, idx) => (
+                          <div key={p.id} className="flex items-center justify-between p-5 rounded-2xl bg-slate-50 border border-slate-100">
+                            <span className="font-black text-xl text-slate-700">{idx + 1}. {p.name}</span>
+                            <span className="text-2xl font-black text-blue-600">{p.score}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <button onClick={() => { if (questionIndex < dynamicQuestions.length - 1) { setQuestionIndex(q => q + 1); setSelectedOptions([]); setHasAnswered(false); setStartTime(Date.now()); setCurrentStep('quiz'); } else setCurrentStep('results'); }} className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl mt-8 shadow-xl transition-all active:scale-95">לשאלה הבאה</button>
                     </div>
                   </div>
                 )}
+
                 {currentStep === 'results' && (
                   <div className="text-center mt-10 animate-slide">
-                    <Trophy size={100} className="text-amber-500 mx-auto mb-6" />
-                    <h2 className="text-5xl font-black mb-8 text-slate-800">החידון הסתיים!</h2>
-                    <button onClick={() => window.location.reload()} className="bg-slate-900 text-white py-5 px-16 rounded-2xl text-xl shadow-xl">משחק חדש</button>
+                    <Trophy size={100} className="text-amber-500 mx-auto mb-6 shadow-xl rounded-full p-4 bg-amber-50" />
+                    <h2 className="text-5xl font-black mb-8">החידון הסתיים!</h2>
+                    <button onClick={() => window.location.reload()} className="bg-slate-900 text-white font-black py-5 px-16 rounded-2xl text-xl shadow-xl transition-all active:scale-95">משחק חדש</button>
                   </div>
                 )}
               </main>
