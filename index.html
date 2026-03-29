@@ -18,17 +18,17 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Users, Trophy, ChevronRight, Send, BarChart2, Award, Clock, CheckCircle2, XCircle, Settings, Save, Plus, Trash2, LogOut, MessageSquare } from 'lucide-react';
 
 /**
- * Firebase configuration - for local development/Vercel
+ * Firebase configuration - Updated with user-provided credentials
  */
 const firebaseConfig = typeof __firebase_config !== 'undefined' 
   ? JSON.parse(__firebase_config) 
   : {
-      apiKey: "",
-      authDomain: "",
-      projectId: "",
-      storageBucket: "",
-      messagingSenderId: "",
-      appId: ""
+      apiKey: "AIzaSyD6YyQzuKAFfujfE5y-gyMsvja4yZ_nlS4",
+      authDomain: "delegationquizv.firebaseapp.com",
+      projectId: "delegationquizv",
+      storageBucket: "delegationquizv.firebasestorage.app",
+      messagingSenderId: "80236670656",
+      appId: "1:80236670656:web:632e8773af3bff79cc4725"
     };
 
 const app = initializeApp(firebaseConfig);
@@ -254,7 +254,6 @@ export default function App() {
     
     relevantAnswers.forEach(ans => {
       if (typeof ans.answer === 'string') {
-        // Split by space, comma, or punctuation
         const words = ans.answer.split(/[\s,.;]+/).filter(w => w.length > 1);
         words.forEach(w => {
           const cleanWord = w.trim();
@@ -265,7 +264,6 @@ export default function App() {
       }
     });
     
-    // Sort and map to Recharts-friendly or cloud-friendly format
     return Object.entries(wordFreq)
       .map(([text, value]) => ({ text, value }))
       .sort((a, b) => b.value - a.value);
