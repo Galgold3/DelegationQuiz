@@ -28,7 +28,7 @@
         const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } = window.Recharts;
         const { Users, Trophy, ChevronRight, Send, BarChart2, Award, Clock, CheckCircle2, XCircle, Settings, Save, Plus, Trash2, LogOut, MessageSquare } = lucide;
 
-        // --- Firebase Config Hardcoded ---
+        // --- Firebase Config Hardcoded (User's provided config) ---
         const firebaseConfig = {
           apiKey: "AIzaSyD6YyQzuKAFfujfE5y-gyMsvja4yZ_nlS4",
           authDomain: "delegationquizv.firebaseapp.com",
@@ -42,7 +42,7 @@
         const app = firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
-        const appId = 'delegation-quiz-final';
+        const appId = 'delegation-quiz-v5';
 
         const { useState, useEffect, useMemo } = React;
 
@@ -139,7 +139,7 @@
                 {currentStep === 'login' && (
                   <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl text-center mt-10 border animate-slide">
                     <Users className="text-blue-600 mx-auto mb-6" size={60} />
-                    <h2 className="text-4xl font-black mb-3 text-slate-800 leading-tight">ברוכים הבאים</h2>
+                    <h2 className="text-4xl font-black mb-3 text-slate-800">ברוכים הבאים</h2>
                     <p className="text-slate-500 mb-10 text-lg">הכנה למשלחות – בואו נראה מה אתם יודעים!</p>
                     <input type="text" className="w-full px-8 py-5 rounded-2xl bg-slate-50 border-2 text-center text-xl font-bold outline-none focus:border-blue-500 shadow-inner" placeholder="הקלידו שם..." value={playerName} onChange={e => setPlayerName(e.target.value)} />
                     <button onClick={handleJoin} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-5 rounded-2xl mt-4 text-lg shadow-xl transition-all active:scale-95">הצטרפות למשחק</button>
@@ -149,64 +149,53 @@
                   <div className="bg-white p-10 rounded-[2.5rem] shadow-xl text-center mt-10 border animate-slide">
                     <h2 className="text-3xl font-black mb-8 text-slate-800">המשתתפים ({players.length})</h2>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
-                      {players.map(p => <div key={p.id} className="bg-slate-50 p-5 rounded-2xl border font-bold truncate text-slate-700">{p.name}</div>)}
+                      {players.map(p => <div key={p.id} className="bg-slate-50 p-5 rounded-2xl border font-bold truncate">{p.name}</div>)}
                     </div>
-                    <button onClick={() => { setQuestionIndex(0); setStartTime(Date.now()); setCurrentStep('quiz'); }} className="bg-green-600 hover:bg-green-700 text-white font-black px-16 py-5 rounded-2xl text-xl shadow-lg transition-all active:scale-95">התחל חידון!</button>
+                    <button onClick={() => { setQuestionIndex(0); setStartTime(Date.now()); setCurrentStep('quiz'); }} className="bg-green-600 text-white font-black px-16 py-5 rounded-2xl text-xl">התחל חידון!</button>
                   </div>
                 )}
                 {currentStep === 'quiz' && dynamicQuestions[questionIndex] && (
                   <div className="space-y-6 animate-slide">
                     <div className="bg-white p-8 rounded-[2rem] shadow-lg border">
-                       <span className="text-blue-600 font-black text-sm uppercase block mb-2">שאלה {questionIndex + 1}</span>
-                       <h2 className="text-2xl md:text-3xl font-black text-slate-800 leading-tight">{dynamicQuestions[questionIndex].question}</h2>
+                      <h2 className="text-2xl md:text-3xl font-black">{dynamicQuestions[questionIndex].question}</h2>
                     </div>
                     <div className="grid gap-4">
                       {dynamicQuestions[questionIndex].type === 'wordcloud' ? (
-                        <div className="flex gap-3 bg-white p-8 rounded-[2rem] border shadow-md">
-                          <input type="text" className="flex-1 p-5 rounded-2xl bg-slate-50 border-2 text-xl font-bold shadow-inner" placeholder="הקלידו כאן..." value={wordCloudInput} onChange={e => setWordCloudInput(e.target.value)} />
-                          <button onClick={submitAnswer} className="bg-blue-600 text-white px-8 rounded-2xl shadow-lg"><Send /></button>
+                        <div className="flex gap-3 bg-white p-8 rounded-[2rem] border">
+                          <input type="text" className="flex-1 p-5 rounded-2xl bg-slate-50 border-2 text-xl font-bold" value={wordCloudInput} onChange={e => setWordCloudInput(e.target.value)} />
+                          <button onClick={submitAnswer} className="bg-blue-600 text-white px-8 rounded-2xl"><Send /></button>
                         </div>
                       ) : (
                         dynamicQuestions[questionIndex].options.map(opt => (
-                          <button key={opt.id} onClick={() => dynamicQuestions[questionIndex].type === 'multiple' ? setSelectedOptions([opt.id]) : setSelectedOptions(prev => prev.includes(opt.id) ? prev.filter(x => x !== opt.id) : [...prev, opt.id])} className={`p-6 rounded-2xl border-2 text-right font-bold transition-all transform ${selectedOptions.includes(opt.id) ? 'border-blue-500 bg-blue-50 shadow-md' : 'bg-white border-slate-100 hover:border-blue-200'}`}>
+                          <button key={opt.id} onClick={() => dynamicQuestions[questionIndex].type === 'multiple' ? setSelectedOptions([opt.id]) : setSelectedOptions(prev => prev.includes(opt.id) ? prev.filter(x => x !== opt.id) : [...prev, opt.id])} className={`p-6 rounded-2xl border-2 text-right font-bold ${selectedOptions.includes(opt.id) ? 'border-blue-500 bg-blue-50' : 'bg-white border-slate-100'}`}>
                             {opt.text}
                           </button>
                         ))
                       )}
                     </div>
-                    {dynamicQuestions[questionIndex].type !== 'wordcloud' && <button onClick={submitAnswer} disabled={selectedOptions.length === 0} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-5 rounded-2xl font-black text-xl shadow-xl disabled:opacity-50">אישור ובדיקה</button>}
+                    {dynamicQuestions[questionIndex].type !== 'wordcloud' && <button onClick={submitAnswer} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-xl">אישור</button>}
                   </div>
                 )}
                 {currentStep === 'feedback' && (
                   <div className="text-center mt-20 animate-bounce-in">
-                    <div className={`w-32 h-32 rounded-full mx-auto mb-8 flex items-center justify-center shadow-xl ${lastQuestionResult?.isCorrect ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                        {lastQuestionResult?.isCorrect ? <CheckCircle2 size={80} /> : <XCircle size={80} />}
-                    </div>
-                    <h2 className={`text-5xl font-black ${lastQuestionResult?.isCorrect ? 'text-green-600' : 'text-red-600'}`}>{lastQuestionResult?.isCorrect ? "כל הכבוד!" : "לא נורא, טעות..."}</h2>
-                    <button onClick={() => setCurrentStep('leaderboard')} className="mt-12 bg-slate-900 text-white py-5 px-16 rounded-2xl shadow-xl transition-all active:scale-95 text-lg font-bold">לתוצאות השאלה</button>
+                    <h2 className="text-5xl font-black">{lastQuestionResult?.isCorrect ? "כל הכבוד!" : "טעות..."}</h2>
+                    <button onClick={() => setCurrentStep('leaderboard')} className="mt-12 bg-slate-900 text-white py-4 px-16 rounded-2xl">לתוצאות</button>
                   </div>
                 )}
                 {currentStep === 'leaderboard' && (
                   <div className="space-y-8 animate-slide">
                     <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl border">
-                      <h2 className="text-2xl font-black mb-8 flex items-center gap-4 text-slate-800"><Trophy className="text-amber-500" /> 5 המובילים</h2>
-                      <div className="space-y-4">
-                        {leaderboard.map((p, i) => (
-                          <div key={p.id} className={`flex justify-between items-center p-5 rounded-2xl border ${p.id === user?.uid ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}>
-                            <span className="font-black text-xl text-slate-700">{i+1}. {p.name}</span>
-                            <span className="text-2xl font-black text-blue-600">{p.score}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <button onClick={() => { if(questionIndex < dynamicQuestions.length-1) { setQuestionIndex(q => q+1); setSelectedOptions([]); setHasAnswered(false); setStartTime(Date.now()); setCurrentStep('quiz'); } else setCurrentStep('results'); }} className="w-full bg-slate-900 hover:bg-slate-800 text-white py-5 rounded-2xl mt-8 font-black text-xl shadow-xl transition-all active:scale-95">לשאלה הבאה</button>
+                      <h2 className="text-2xl font-black mb-8">טבלת מובילים</h2>
+                      {leaderboard.map((p, i) => <div key={p.id} className="flex justify-between p-4 border-b font-bold"><span>{i+1}. {p.name}</span><span>{p.score}</span></div>)}
+                      <button onClick={() => { if(questionIndex < dynamicQuestions.length-1) { setQuestionIndex(q => q+1); setSelectedOptions([]); setHasAnswered(false); setStartTime(Date.now()); setCurrentStep('quiz'); } else setCurrentStep('results'); }} className="w-full bg-slate-900 text-white py-4 rounded-2xl mt-8">לשאלה הבאה</button>
                     </div>
                   </div>
                 )}
                 {currentStep === 'results' && (
                   <div className="text-center mt-10 animate-slide">
-                    <Trophy size={120} className="text-amber-500 mx-auto mb-6 drop-shadow-lg" />
-                    <h2 className="text-5xl font-black mb-8 text-slate-800">החידון הסתיים!</h2>
-                    <button onClick={() => window.location.reload()} className="bg-slate-900 text-white py-5 px-20 rounded-2xl text-2xl font-black shadow-2xl transition-all active:scale-95">משחק חדש</button>
+                    <Trophy size={100} className="text-amber-500 mx-auto mb-6" />
+                    <h2 className="text-5xl font-black mb-8">החידון הסתיים!</h2>
+                    <button onClick={() => window.location.reload()} className="bg-slate-900 text-white py-5 px-16 rounded-2xl text-xl shadow-xl">משחק חדש</button>
                   </div>
                 )}
               </main>
