@@ -6,54 +6,29 @@
     <title>משחק תדריך משלחת</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap');
-        body { font-family: 'Heebo', sans-serif; background-color: #f8fafc; margin: 0; }
-        .animate-slide { animation: slide-up 0.4s ease-out both; }
-        @keyframes slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        .animate-bounce-in { animation: bounce-in 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        @keyframes bounce-in { 0% { transform: scale(0.3); opacity: 0; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); } }
-    </style>
-</head>
-<body class="bg-slate-50 text-slate-900">
-    <div id="root"></div>
-
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;700;900&display=swap" rel="stylesheet">
+    
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
-    <script src="https://unpkg.com/recharts@2.12.2/umd/Recharts.js"></script>
-    <script src="https://unpkg.com/lucide-react@0.344.0/dist/umd/lucide-react.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
+    <style>
+        body { font-family: 'Heebo', sans-serif; background-color: #f8fafc; margin: 0; direction: rtl; }
+        .animate-slide { animation: slide-up 0.4s ease-out both; }
+        @keyframes slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .timer-bar { transition: width 1s linear; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
     <script type="text/babel">
-        // שימוש ב-Proxy כדי למנוע את שגיאת ה-undefined של האייקונים
-        const getIcons = () => {
-            const icons = window.lucideReact || {};
-            return {
-                Users: icons.Users || (() => <span>👥</span>),
-                Trophy: icons.Trophy || (() => <span>🏆</span>),
-                ChevronRight: icons.ChevronRight || (() => <span>→</span>),
-                Send: icons.Send || (() => <span>🚀</span>),
-                BarChart2: icons.BarChart2 || (() => <span>📊</span>),
-                Award: icons.Award || (() => <span>🥇</span>),
-                CheckCircle2: icons.CheckCircle2 || (() => <span>✅</span>),
-                XCircle: icons.XCircle || (() => <span>❌</span>),
-                Settings: icons.Settings || (() => <span>⚙️</span>),
-                Save: icons.Save || (() => <span>💾</span>),
-                Plus: icons.Plus || (() => <span>➕</span>),
-                Trash2: icons.Trash2 || (() => <span>🗑️</span>),
-                LogOut: icons.LogOut || (() => <span>🚪</span>),
-                MessageSquare: icons.MessageSquare || (() => <span>💬</span>)
-            };
-        };
+        const { useState, useEffect, useMemo, useRef } = React;
 
-        const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } = window.Recharts || {};
-        const { useState, useEffect, useMemo } = React;
-
-        // Firebase Config
+        // Firebase Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyD6YyQzuKAFfujfE5y-gyMsvja4yZ_nlS4",
             authDomain: "delegationquizv.firebaseapp.com",
@@ -69,61 +44,55 @@
         const appId = 'delegation-quiz-v5';
 
         const DEFAULT_QUESTIONS = [
-            { id: 1, type: 'wordcloud', question: "מהם הדברים שיש לוודא טרם הגעה לתדריך למשלחת?", description: "כתבו מילה או שתיים שחשוב לבדוק מראש" },
-            { id: 2, type: 'multiple', question: "היכן ניתן לראות את רמת האיום בכל מדינה?", options: [{ id: 'a', text: "א. באתר השגרירות" }, { id: 'b', text: "ב. מידע לא נגיש" }, { id: 'c', text: "ג. באתר המל\"ל", correct: true }, { id: 'd', text: "ד. בתקשורת" }] },
-            { id: 3, type: 'multiple_select', question: "איזה משפט הכי נכון?", hint: "יש יותר מתשובה אחת נכונה", options: [{ id: 'a', text: "א. תדריך אחיד" }, { id: 'b', text: "ב. להפחיד" }, { id: 'c', text: "ג. מדויק למשלחת", correct: true }, { id: 'd', text: "ד. מערב משתתפים", correct: true }] },
-            { id: 4, type: 'multiple', question: "האם הורים נחשבים מלווים?", options: [{ id: 'a', text: "א. כן, כמבוגר אחראי" }, { id: 'b', text: "ב. לא, למעט חריגים", correct: true }, { id: 'c', text: "ג. כן, באישור" }, { id: 'd', text: "ד. לא, לא היו בתדריך" }] },
-            { id: 5, type: 'multiple', question: "מה המפתח של מלווים למשלחת עצמאית?", options: [{ id: 'a', text: "א. מנהל + 1 לכל 15", correct: true }, { id: 'b', text: "ב. מנהל + 1 לכל 10" }, { id: 'c', text: "ג. מנהל + 1 לכל 20" }, { id: 'd', text: "ד. 1 לכל 15 ללא מנהל" }] }
+            { id: 1, type: 'wordcloud', question: "מהם הדברים שיש לוודא טרם הגעה לתדריך למשלחת?", summary: "הכנה מראש היא המפתח לתדריך אפקטיבי וביטחון המשלחת." },
+            { id: 2, type: 'multiple', question: "היכן ניתן לראות את רמת האיום בכל מדינה?", options: [{ id: 'a', text: "באתר השגרירות" }, { id: 'c', text: "באתר המל\"ל", correct: true }], summary: "אתר המל\"ל הוא המקור הרשמי והמעודכן ביותר לרמות איום." },
+            { id: 3, type: 'multiple_select', question: "איזה משפט הכי נכון?", options: [{ id: 'c', text: "מדויק למשלחת", correct: true }, { id: 'd', text: "מערב משתתפים", correct: true }], summary: "תדריך טוב הוא תדריך מותאם אישית שיוצר מעורבות של המשתתפים." }
         ];
 
         function App() {
-            const icons = useMemo(() => getIcons(), []);
-            const { Users, Trophy, ChevronRight, Send, BarChart2, Award, CheckCircle2, XCircle, Settings, Save, Plus, Trash2, LogOut, MessageSquare } = icons;
-
             const [user, setUser] = useState(null);
             const [playerName, setPlayerName] = useState('');
             const [currentStep, setCurrentStep] = useState('login');
             const [questionIndex, setQuestionIndex] = useState(0);
             const [selectedOptions, setSelectedOptions] = useState([]);
             const [wordCloudInput, setWordCloudInput] = useState('');
+            const [timeLeft, setTimeLeft] = useState(20);
             const [startTime, setStartTime] = useState(null);
             const [hasAnswered, setHasAnswered] = useState(false);
-            const [lastResult, setLastResult] = useState(null);
             const [players, setPlayers] = useState([]);
             const [answers, setAnswers] = useState([]);
             const [dynamicQuestions, setDynamicQuestions] = useState(DEFAULT_QUESTIONS);
             const [adminPass, setAdminPass] = useState('');
 
+            // Auth & Sync
             useEffect(() => {
-                const unsubAuth = auth.onAuthStateChanged(async (u) => {
-                    if (!u) await auth.signInAnonymously();
-                    setUser(u);
-                });
-                return unsubAuth;
+                const unsub = auth.onAuthStateChanged(u => { if (!u) auth.signInAnonymously(); setUser(u); });
+                return unsub;
             }, []);
 
             useEffect(() => {
                 if (!user) return;
                 const path = db.collection('artifacts').doc(appId).collection('public').doc('data');
-                const unsubQ = path.collection('config').doc('questions').onSnapshot(s => {
-                    if (s.exists && s.data().list) setDynamicQuestions(s.data().list);
-                });
+                const unsubQ = path.collection('config').doc('questions').onSnapshot(s => { if (s.exists) setDynamicQuestions(s.data().list); });
                 const unsubP = path.collection('players').onSnapshot(s => setPlayers(s.docs.map(d => ({id: d.id, ...d.data()}))));
                 const unsubA = path.collection('answers').onSnapshot(s => setAnswers(s.docs.map(d => ({id: d.id, ...d.data()}))));
                 return () => { unsubQ(); unsubP(); unsubA(); };
             }, [user]);
 
-            const handleJoin = async () => {
-                if (!playerName.trim() || !user) return;
-                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('players').doc(user.uid).set({
-                    name: String(playerName), score: 0, totalTime: 0, lastActive: Date.now()
-                });
-                setCurrentStep('lobby');
-            };
+            // Timer Logic
+            useEffect(() => {
+                let timer;
+                if (currentStep === 'quiz' && timeLeft > 0 && !hasAnswered) {
+                    timer = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
+                } else if (timeLeft === 0 && !hasAnswered) {
+                    submitAnswer();
+                }
+                return () => clearInterval(timer);
+            }, [timeLeft, currentStep, hasAnswered]);
 
             const submitAnswer = async () => {
-                if (hasAnswered || !user) return;
-                const timeTaken = (Date.now() - (startTime || Date.now())) / 1000;
+                if (hasAnswered) return;
+                const timeTaken = 20 - timeLeft;
                 const q = dynamicQuestions[questionIndex];
                 let isCorrect = false;
 
@@ -134,103 +103,83 @@
                     isCorrect = correctIds === [...selectedOptions].sort().join(',');
                 }
 
-                let points = 0;
                 if (isCorrect && q.type !== 'wordcloud') {
-                    points = Math.max(100 - Math.floor(timeTaken), 50);
+                    const points = Math.max(100 - timeTaken, 50);
                     const p = players.find(p => p.id === user.uid);
                     await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('players').doc(user.uid).update({
-                        score: (p?.score || 0) + points, totalTime: (p?.totalTime || 0) + timeTaken
+                        score: (p?.score || 0) + points
                     });
                 }
 
                 await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('answers').add({
-                    playerId: user.uid, playerName, questionId: q.id, answer: q.type === 'wordcloud' ? String(wordCloudInput) : selectedOptions,
-                    isCorrect, timeTaken, timestamp: Date.now()
+                    playerId: user.uid, playerName, questionId: q.id, answer: q.type === 'wordcloud' ? wordCloudInput : selectedOptions,
+                    isCorrect, timestamp: Date.now()
                 });
 
-                setLastResult({ isCorrect, points, type: q.type });
                 setHasAnswered(true);
                 setCurrentStep('feedback');
             };
 
-            const leaderboard = useMemo(() => [...players].sort((a,b) => (b.score||0)-(a.score||0)).slice(0, 5), [players]);
-
-            const currentWordCloudData = useMemo(() => {
-                const qId = dynamicQuestions[questionIndex]?.id;
-                const wordFreq = {};
-                answers.filter(a => a.questionId === qId).forEach(ans => {
-                    if (typeof ans.answer === 'string') {
-                        ans.answer.split(/[\s,.;]+/).filter(w => w.length > 1).forEach(w => {
-                            const clean = w.trim();
-                            if (clean) wordFreq[clean] = (wordFreq[clean] || 0) + 1;
-                        });
-                    }
-                });
-                return Object.entries(wordFreq).map(([text, value]) => ({ text, value })).sort((a, b) => b.value - a.value);
-            }, [answers, dynamicQuestions, questionIndex]);
-
-            const getStats = (qId) => {
-                const q = dynamicQuestions.find(qi => qi.id === qId);
-                if (!q || q.type === 'wordcloud') return [];
-                const qAns = answers.filter(a => a.questionId === qId);
-                return q.options.map(opt => ({
-                    name: opt.text.length > 12 ? opt.text.substring(0,12)+'...' : opt.text,
-                    count: qAns.filter(a => Array.isArray(a.answer) && a.answer.includes(opt.id)).length,
-                    isCorrect: opt.correct
-                }));
+            const resetGame = async () => {
+                if (!confirm("בטוחה שאת רוצה למחוק את כל התוצאות והשחקנים?")) return;
+                const path = db.collection('artifacts').doc(appId).collection('public').doc('data');
+                const playersSnapshot = await path.collection('players').get();
+                const answersSnapshot = await path.collection('answers').get();
+                const batch = db.batch();
+                playersSnapshot.forEach(doc => batch.delete(doc.ref));
+                answersSnapshot.forEach(doc => batch.delete(doc.ref));
+                await batch.commit();
+                alert("המשחק אופס!");
             };
 
+            const leaderboard = useMemo(() => [...players].sort((a,b) => (b.score||0)-(a.score||0)).slice(0, 5), [players]);
+
             return (
-                <div className="min-h-screen flex flex-col items-center p-4" dir="rtl">
+                <div className="min-h-screen flex flex-col items-center p-4">
                     <nav className="w-full max-w-4xl flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border mb-6">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-blue-600 p-2 rounded-xl text-white"><Award size={24} /></div>
-                            <h1 className="text-xl font-black">משחק תדריך משלחת</h1>
-                        </div>
-                        {playerName && <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-full font-bold">{playerName}</div>}
+                        <div className="font-black text-xl text-blue-600">🏆 תדריך משלחת</div>
+                        {playerName && <div className="bg-blue-50 text-blue-700 px-4 py-1 rounded-full font-bold">{playerName}</div>}
                     </nav>
 
-                    <main className="w-full max-w-2xl flex-1">
+                    <main className="w-full max-w-2xl">
                         {currentStep === 'login' && (
                             <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl border text-center animate-slide">
-                                <Users size={64} className="mx-auto text-blue-500 mb-6" />
-                                <h2 className="text-3xl font-black mb-6 text-slate-800">ברוכים הבאים</h2>
-                                <input type="text" className="w-full p-5 rounded-2xl bg-slate-50 border-2 mb-4 text-center text-xl font-bold outline-none focus:border-blue-500" placeholder="איך קוראים לך?" value={playerName} onChange={e => setPlayerName(e.target.value)} />
-                                <button onClick={handleJoin} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-xl shadow-lg">הצטרפות למשחק</button>
+                                <h2 className="text-3xl font-black mb-6 uppercase tracking-tight">כניסה למשחק</h2>
+                                <input type="text" className="w-full p-5 rounded-2xl bg-slate-50 border-2 mb-4 text-center text-xl font-bold outline-none focus:border-blue-500" placeholder="מה השם שלך?" value={playerName} onChange={e => setPlayerName(e.target.value)} />
+                                <button onClick={() => { if(playerName) { db.collection('artifacts').doc(appId).collection('public').doc('data').collection('players').doc(user.uid).set({name: playerName, score: 0}); setCurrentStep('lobby'); } }} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-xl shadow-lg">הצטרפות</button>
                             </div>
                         )}
 
                         {currentStep === 'lobby' && (
                             <div className="bg-white p-10 rounded-[2.5rem] shadow-xl border text-center animate-slide">
-                                <h2 className="text-2xl font-black mb-8">המשתתפים בלובי ({players.length})</h2>
+                                <h2 className="text-2xl font-black mb-8">המשתתפים ({players.length})</h2>
                                 <div className="grid grid-cols-2 gap-3 mb-10">
                                     {players.map(p => <div key={p.id} className="p-4 bg-slate-50 rounded-xl font-bold border truncate">{p.name}</div>)}
                                 </div>
-                                <button onClick={() => { setQuestionIndex(0); setStartTime(Date.now()); setCurrentStep('quiz'); setHasAnswered(false); }} className="bg-green-600 text-white px-12 py-5 rounded-2xl font-black text-xl shadow-lg">התחל חידון!</button>
+                                <button onClick={() => { setQuestionIndex(0); setTimeLeft(20); setHasAnswered(false); setCurrentStep('quiz'); }} className="bg-green-600 text-white px-12 py-5 rounded-2xl font-black text-xl shadow-lg">התחל!</button>
                             </div>
                         )}
 
                         {currentStep === 'quiz' && (
                             <div className="space-y-6 animate-slide">
-                                <div className="bg-white p-8 rounded-[2rem] shadow-lg border">
-                                    <h2 className="text-2xl md:text-3xl font-black leading-tight text-slate-800">{dynamicQuestions[questionIndex].question}</h2>
-                                    {dynamicQuestions[questionIndex].hint && <div className="mt-3 text-indigo-600 font-bold bg-indigo-50 p-2 rounded-lg inline-flex items-center gap-2"><CheckCircle2 size={18}/>{dynamicQuestions[questionIndex].hint}</div>}
+                                <div className="w-full bg-slate-200 h-3 rounded-full overflow-hidden">
+                                    <div className="bg-blue-500 h-full timer-bar" style={{ width: `${(timeLeft / 20) * 100}%` }}></div>
                                 </div>
+                                <div className="text-center font-black text-2xl text-blue-600">⏱️ {timeLeft} שניות</div>
+                                
+                                <div className="bg-white p-8 rounded-[2rem] shadow-lg border">
+                                    <h2 className="text-2xl font-black leading-tight text-slate-800">{dynamicQuestions[questionIndex].question}</h2>
+                                </div>
+
                                 <div className="grid gap-3">
                                     {dynamicQuestions[questionIndex].type === 'wordcloud' ? (
-                                        <div className="bg-white p-10 rounded-[2rem] border-2 text-center">
-                                            <p className="text-slate-500 mb-6">{dynamicQuestions[questionIndex].description}</p>
-                                            <div className="flex gap-3">
-                                                <input type="text" className="flex-1 p-5 rounded-2xl bg-slate-50 border-2 text-xl font-bold outline-none focus:border-blue-500" value={wordCloudInput} onChange={e => setWordCloudInput(e.target.value)} placeholder="הקלידו תשובה..." />
-                                                <button onClick={submitAnswer} className="bg-blue-600 text-white px-8 rounded-2xl"><Send /></button>
-                                            </div>
+                                        <div className="bg-white p-8 rounded-[2rem] border-2 text-center">
+                                            <input type="text" className="w-full p-4 rounded-xl bg-slate-50 border text-xl font-bold text-center mb-4" value={wordCloudInput} onChange={e => setWordCloudInput(e.target.value)} placeholder="הקלידו תשובה..." />
+                                            <button onClick={submitAnswer} className="bg-blue-600 text-white py-4 px-10 rounded-xl font-black">שלח</button>
                                         </div>
                                     ) : (
                                         dynamicQuestions[questionIndex].options.map(opt => (
-                                            <button key={opt.id} onClick={() => dynamicQuestions[questionIndex].type === 'multiple' ? setSelectedOptions([opt.id]) : setSelectedOptions(prev => prev.includes(opt.id) ? prev.filter(x => x !== opt.id) : [...prev, opt.id])} className={`p-6 rounded-2xl border-2 text-right font-bold transition-all flex items-center justify-between ${selectedOptions.includes(opt.id) ? 'border-blue-500 bg-blue-50' : 'bg-white border-slate-100 hover:border-slate-300'}`}>
-                                                <span>{opt.text}</span>
-                                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${selectedOptions.includes(opt.id) ? 'bg-blue-500 border-blue-500 text-white' : 'border-slate-300'}`}>{selectedOptions.includes(opt.id) && "✓"}</div>
-                                            </button>
+                                            <button key={opt.id} onClick={() => dynamicQuestions[questionIndex].type === 'multiple' ? setSelectedOptions([opt.id]) : setSelectedOptions(p => p.includes(opt.id) ? p.filter(x => x !== opt.id) : [...p, opt.id])} className={`p-6 rounded-2xl border-2 text-right font-bold transition-all ${selectedOptions.includes(opt.id) ? 'border-blue-500 bg-blue-50' : 'bg-white border-slate-100'}`}>{opt.text}</button>
                                         ))
                                     )}
                                 </div>
@@ -239,105 +188,93 @@
                         )}
 
                         {currentStep === 'feedback' && (
-                            <div className="text-center mt-12 animate-bounce-in bg-white p-12 rounded-[3rem] shadow-xl border">
-                                <div className="mb-6 mx-auto">
-                                    {lastResult?.isCorrect ? <CheckCircle2 size={80} className="text-green-500 mx-auto" /> : <XCircle size={80} className="text-red-500 mx-auto" />}
+                            <div className="text-center mt-12 animate-slide bg-white p-10 rounded-[3rem] shadow-xl border">
+                                <h2 className="text-4xl font-black mb-6 text-blue-600">סיכום שאלה</h2>
+                                
+                                {dynamicQuestions[questionIndex].type !== 'wordcloud' && (
+                                    <div className="mb-8 p-6 bg-green-50 rounded-2xl border border-green-100">
+                                        <p className="text-green-800 font-bold text-xl">התשובה הנכונה:</p>
+                                        <p className="text-2xl font-black">{dynamicQuestions[questionIndex].options.filter(o => o.correct).map(o => o.text).join(', ')}</p>
+                                    </div>
+                                )}
+
+                                <div className="mb-10 text-right">
+                                    <p className="text-slate-400 font-bold mb-2">משפט מסכם:</p>
+                                    <p className="text-xl font-bold leading-relaxed">{dynamicQuestions[questionIndex].summary || "אין משפט מסכם לשאלה זו."}</p>
                                 </div>
-                                <h2 className="text-5xl font-black mb-4">{lastResult?.isCorrect ? "כל הכבוד!" : "טעות..."}</h2>
-                                {lastResult?.type !== 'wordcloud' && <p className="text-xl text-slate-500 mb-10">צברת {lastResult?.points || 0} נקודות</p>}
-                                <button onClick={() => setCurrentStep('leaderboard')} className="bg-slate-900 text-white py-5 px-16 rounded-2xl text-xl font-bold">לתוצאות המשלחת</button>
+
+                                <button onClick={() => setCurrentStep('leaderboard')} className="bg-slate-900 text-white py-5 px-16 rounded-2xl text-xl font-bold">איך המשלחת ענתה? 📊</button>
                             </div>
                         )}
 
                         {currentStep === 'leaderboard' && (
                             <div className="space-y-8 animate-slide">
                                 <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl border">
-                                    <div className="flex justify-between items-center mb-6">
-                                        <h2 className="text-2xl font-black flex items-center gap-2"><Trophy className="text-amber-500" /> מובילים</h2>
-                                        <button onClick={() => { if (questionIndex < dynamicQuestions.length - 1) { setQuestionIndex(q => q + 1); setSelectedOptions([]); setHasAnswered(false); setStartTime(Date.now()); setWordCloudInput(''); setCurrentStep('quiz'); } else setCurrentStep('results'); }} className="bg-slate-900 text-white py-3 px-6 rounded-xl font-bold flex items-center gap-2">לשאלה הבאה <ChevronRight size={18} /></button>
-                                    </div>
-                                    <div className="space-y-3">
-                                        {leaderboard.map((p, i) => <div key={p.id} className="flex justify-between p-5 bg-slate-50 rounded-2xl font-bold border"><span>{i+1}. {p.name}</span><span className="text-blue-600">{p.score}</span></div>)}
-                                    </div>
+                                    <h2 className="text-2xl font-black mb-6 flex justify-between">🏆 5 המובילים <button onClick={() => { if (questionIndex < dynamicQuestions.length - 1) { setQuestionIndex(i => i + 1); setSelectedOptions([]); setTimeLeft(20); setHasAnswered(false); setWordCloudInput(''); setCurrentStep('quiz'); } else setCurrentStep('results'); }} className="text-blue-600 text-sm">המשך לשאלה הבאה ➔</button></h2>
+                                    {leaderboard.map((p, i) => <div key={p.id} className="flex justify-between p-4 mb-2 bg-slate-50 rounded-xl font-bold"><span>{i+1}. {p.name}</span><span className="text-blue-600">{p.score}</span></div>)}
                                 </div>
-                                <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border">
-                                    <h3 className="font-bold text-2xl mb-8 flex items-center gap-2"><BarChart2 className="text-blue-500" /> פילוח התשובות</h3>
-                                    {dynamicQuestions[questionIndex].type === 'wordcloud' ? (
-                                        <div className="flex flex-wrap gap-3 justify-center items-center p-10 bg-slate-50 rounded-3xl border-2 border-dashed">
-                                            {currentWordCloudData.map((w, i) => <span key={i} style={{ fontSize: `${1 + w.value * 0.5}rem` }} className="font-black text-blue-600 px-2">{w.text}</span>)}
-                                        </div>
-                                    ) : (
-                                        <div className="h-[300px]">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <BarChart data={getStats(dynamicQuestions[questionIndex].id)} margin={{ bottom: 80 }}>
-                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                                    <XAxis dataKey="name" interval={0} angle={-45} textAnchor="end" height={80} tick={{fontSize: 12}} />
-                                                    <YAxis hide />
-                                                    <Tooltip />
-                                                    <Bar dataKey="count" radius={[10, 10, 0, 0]} barSize={40}>
-                                                        {getStats(dynamicQuestions[questionIndex].id).map((entry, index) => <Cell key={index} fill={entry.isCorrect ? '#10b981' : '#cbd5e1'} />)}
-                                                        <LabelList dataKey="count" position="top" />
-                                                    </Bar>
-                                                </BarChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                    )}
+                                <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border text-right">
+                                    <h3 className="font-bold text-xl mb-6">פילוח תשובות המשלחת:</h3>
+                                    {dynamicQuestions[questionIndex].options?.map(opt => {
+                                        const count = answers.filter(a => a.questionId === dynamicQuestions[questionIndex].id && Array.isArray(a.answer) && a.answer.includes(opt.id)).length;
+                                        return (
+                                            <div key={opt.id} className="mb-4 flex justify-between items-center p-4 bg-slate-50 rounded-xl border">
+                                                <span className={opt.correct ? "text-green-600 font-black" : "font-bold"}>{opt.text}</span>
+                                                <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-black">{count} ענו</span>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}
 
                         {currentStep === 'results' && (
                             <div className="text-center mt-10 animate-slide">
-                                <Trophy size={100} className="text-amber-500 mx-auto mb-6 p-4 bg-amber-50 rounded-full" />
-                                <h2 className="text-5xl font-black mb-12 text-slate-800">החידון הסתיים!</h2>
+                                <div className="text-7xl mb-6">👑</div>
+                                <h2 className="text-5xl font-black mb-8">החידון הסתיים!</h2>
+                                <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl border mb-10">
+                                    <h2 className="text-2xl font-black mb-6">🏆 טבלת המנצחים</h2>
+                                    {leaderboard.map((p, i) => <div key={p.id} className="flex justify-between p-5 mb-2 bg-slate-50 rounded-2xl font-black text-xl"><span>{i+1}. {p.name}</span><span className="text-blue-600">{p.score}</span></div>)}
+                                </div>
                                 <button onClick={() => window.location.reload()} className="bg-slate-900 text-white py-6 px-20 rounded-2xl text-xl font-black shadow-2xl">משחק חדש</button>
                             </div>
                         )}
 
                         {currentStep === 'admin_login' && (
                             <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl border text-center max-w-sm mx-auto mt-20">
-                                <Settings size={48} className="mx-auto mb-6 text-slate-400" />
-                                <h2 className="text-2xl font-black mb-6">כניסת מנהל</h2>
-                                <input type="password" placeholder="סיסמה..." className="w-full p-4 rounded-xl border-2 mb-4 text-center font-bold outline-none" value={adminPass} onChange={e => setAdminPass(e.target.value)} onKeyDown={e => e.key === 'Enter' && adminPass === '12345' && setCurrentStep('admin_panel')} autoFocus />
-                                <button onClick={() => adminPass === '12345' ? setCurrentStep('admin_panel') : alert("טעות")} className="w-full bg-slate-900 text-white p-4 rounded-xl font-bold">כניסה</button>
+                                <h2 className="text-2xl font-black mb-6">ניהול ⚙️</h2>
+                                <input type="password" placeholder="סיסמה" className="w-full p-4 rounded-xl border-2 mb-4 text-center" value={adminPass} onChange={e => setAdminPass(e.target.value)} onKeyDown={e => e.key === 'Enter' && adminPass === '12345' && setCurrentStep('admin_panel')} autoFocus />
                             </div>
                         )}
 
                         {currentStep === 'admin_panel' && (
                             <div className="space-y-6 animate-slide">
                                 <div className="flex justify-between items-center bg-white p-6 rounded-3xl border">
-                                    <h2 className="text-2xl font-black flex items-center gap-3"><Settings /> ניהול שאלות</h2>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => { db.collection('artifacts').doc(appId).collection('public').doc('data').collection('config').doc('questions').set({ list: dynamicQuestions }); alert("נשמר!"); }} className="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold flex items-center gap-2"><Save size={18}/> שמור</button>
-                                        <button onClick={() => setCurrentStep('login')} className="bg-slate-100 text-slate-600 px-6 py-2 rounded-xl font-bold flex items-center gap-2"><LogOut size={18}/> יציאה</button>
-                                    </div>
+                                    <h2 className="text-2xl font-black">ניהול שאלות ⚙️</h2>
+                                    <button onClick={resetGame} className="bg-red-500 text-white px-4 py-2 rounded-xl font-bold">מחיקת כל התוצאות 🗑️</button>
                                 </div>
                                 {dynamicQuestions.map((q, qIdx) => (
                                     <div key={q.id} className="bg-white p-6 rounded-[2rem] shadow border space-y-4">
-                                        <textarea className="w-full p-4 bg-slate-50 rounded-xl font-bold" value={q.question} onChange={e => { const n = [...dynamicQuestions]; n[qIdx].question = e.target.value; setDynamicQuestions(n); }} />
-                                        {q.type !== 'wordcloud' && q.options.map((opt, oIdx) => (
-                                            <div key={opt.id} className="flex gap-2">
-                                                <input type="text" className="flex-1 p-3 bg-slate-50 rounded-lg" value={opt.text} onChange={e => { const n = [...dynamicQuestions]; n[qIdx].options[oIdx].text = e.target.value; setDynamicQuestions(n); }} />
-                                                <button onClick={() => { const n = [...dynamicQuestions]; if(q.type === 'multiple') n[qIdx].options.forEach(o => o.correct = false); n[qIdx].options[oIdx].correct = !n[qIdx].options[oIdx].correct; setDynamicQuestions(n); }} className={`px-4 py-2 rounded-lg font-bold ${opt.correct ? 'bg-green-600 text-white' : 'bg-slate-100 text-slate-400'}`}>{opt.correct ? 'נכון' : 'לא'}</button>
-                                            </div>
-                                        ))}
-                                        <button onClick={() => setDynamicQuestions(dynamicQuestions.filter((_, i) => i !== qIdx))} className="text-red-400 flex items-center gap-1"><Trash2 size={16}/> מחק שאלה</button>
+                                        <label className="font-bold">שאלה:</label>
+                                        <textarea className="w-full p-3 bg-slate-50 rounded-xl" value={q.question} onChange={e => { const n = [...dynamicQuestions]; n[qIdx].question = e.target.value; setDynamicQuestions(n); }} />
+                                        <label className="font-bold">משפט מסכם:</label>
+                                        <textarea className="w-full p-3 bg-blue-50 rounded-xl" value={q.summary} onChange={e => { const n = [...dynamicQuestions]; n[qIdx].summary = e.target.value; setDynamicQuestions(n); }} />
+                                        <button onClick={() => { db.collection('artifacts').doc(appId).collection('public').doc('data').collection('config').doc('questions').set({ list: dynamicQuestions }); alert("נשמר!"); }} className="bg-blue-600 text-white py-3 w-full rounded-xl font-black">שמור שינויים</button>
                                     </div>
                                 ))}
-                                <button onClick={() => setDynamicQuestions([...dynamicQuestions, { id: Date.now(), type: 'multiple', question: 'שאלה חדשה', options: [{id: 'a', text: 'אופציה 1', correct: true}, {id: 'b', text: 'אופציה 2', correct: false}] }])} className="w-full py-6 border-4 border-dashed rounded-3xl text-slate-400 font-black">+ הוסף שאלה</button>
+                                <button onClick={() => setCurrentStep('login')} className="w-full bg-slate-200 py-4 rounded-xl font-bold">חזרה למשחק</button>
                             </div>
                         )}
                     </main>
 
                     <footer className="py-10">
-                        <button onClick={() => setCurrentStep('admin_login')} className="text-slate-300 hover:text-blue-500 opacity-50 hover:opacity-100 text-xs flex items-center gap-1"><Settings size={12}/> ניהול מערכת</button>
+                        <button onClick={() => setCurrentStep('admin_login')} className="text-slate-300 text-xs opacity-50 hover:opacity-100">⚙️ ניהול</button>
                     </footer>
                 </div>
             );
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
 </body>
 </html>
