@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>משחק תדריך משלחת - גרסה מלאה</title>
+    <title>משחק תדריך משלחת - גרסה סופית</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;700;900&display=swap" rel="stylesheet">
@@ -19,7 +19,7 @@
         body { font-family: 'Heebo', sans-serif; background-color: #f8fafc; margin: 0; direction: rtl; }
         .animate-slide { animation: slide-up 0.4s ease-out both; }
         @keyframes slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        .animate-pop { animation: pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .animate-pop { animation: pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
         @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         .timer-bar { transition: width 1s linear; }
     </style>
@@ -179,7 +179,7 @@
 
                 setLastResult({ isCorrect, points, type: q.type });
                 setHasAnswered(true);
-                setCurrentStep('leaderboard');
+                setCurrentStep('instant_feedback'); // שלב חדש: חיווי מיידי
             };
 
             const resetGame = async () => {
@@ -218,19 +218,17 @@
                     </nav>
 
                     <main className="w-full max-w-2xl">
-                        {/* מסך כניסה */}
                         {currentStep === 'login' && (
                             <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl border text-center animate-slide">
-                                <h2 className="text-3xl font-black mb-6">ברוכים הבאים</h2>
+                                <h2 className="text-3xl font-black mb-6 tracking-tight">ברוכים הבאים</h2>
                                 <input type="text" className="w-full p-5 rounded-2xl bg-slate-50 border-2 mb-4 text-center text-xl font-bold outline-none focus:border-blue-500" placeholder="מה השם שלך?" value={playerName} onChange={e => setPlayerName(e.target.value)} />
-                                <button onClick={handleJoin} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-xl shadow-lg">הצטרפות למשחק</button>
+                                <button onClick={handleJoin} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-xl shadow-lg">הצטרפות</button>
                             </div>
                         )}
 
-                        {/* לובי */}
                         {currentStep === 'lobby' && (
                             <div className="bg-white p-10 rounded-[2.5rem] shadow-xl border text-center animate-slide">
-                                <h2 className="text-2xl font-black mb-8">המשתתפים בחדר ({players.length})</h2>
+                                <h2 className="text-2xl font-black mb-8 text-slate-800">המשתתפים בחדר ({players.length})</h2>
                                 <div className="grid grid-cols-2 gap-3 mb-10">
                                     {players.map(p => <div key={p.id} className="p-4 bg-slate-50 rounded-xl font-bold border truncate">{p.name}</div>)}
                                 </div>
@@ -238,13 +236,12 @@
                             </div>
                         )}
 
-                        {/* מסך שאלה */}
                         {currentStep === 'quiz' && dynamicQuestions[questionIndex] && (
                             <div className="space-y-6 animate-slide">
                                 <div className="w-full bg-slate-200 h-3 rounded-full overflow-hidden shadow-inner">
                                     <div className="bg-blue-500 h-full timer-bar" style={{ width: `${(timeLeft / 20) * 100}%` }}></div>
                                 </div>
-                                <div className="text-center font-black text-3xl text-blue-600 mb-2 animate-pulse">⏱️ {timeLeft}</div>
+                                <div className="text-center font-black text-3xl text-blue-600 mb-2">⏱️ {timeLeft}</div>
                                 <div className="bg-white p-8 rounded-[2rem] shadow-lg border">
                                     <h2 className="text-2xl font-black leading-tight text-slate-800">{dynamicQuestions[questionIndex].question}</h2>
                                     {dynamicQuestions[questionIndex].hint && <div className="mt-2 text-indigo-600 font-bold bg-indigo-50 p-2 rounded-lg inline-block text-sm">💡 {dynamicQuestions[questionIndex].hint}</div>}
@@ -254,80 +251,90 @@
                                         <div className="bg-white p-8 rounded-[2rem] border-2 text-center">
                                             <p className="text-slate-500 mb-4">{dynamicQuestions[questionIndex].description}</p>
                                             <input type="text" className="w-full p-4 rounded-xl bg-slate-50 border text-xl font-bold text-center mb-4" value={wordCloudInput} onChange={e => setWordCloudInput(e.target.value)} placeholder="כתבו כאן..." />
-                                            <button onClick={submitAnswer} className="bg-blue-600 text-white py-4 px-10 rounded-xl font-black">שלח</button>
+                                            <button onClick={submitAnswer} className="bg-blue-600 text-white py-4 px-10 rounded-xl font-black">שלח 🚀</button>
                                         </div>
                                     ) : (
                                         dynamicQuestions[questionIndex].options.map(opt => (
-                                            <button key={opt.id} onClick={() => dynamicQuestions[questionIndex].type === 'multiple' ? setSelectedOptions([opt.id]) : setSelectedOptions(p => p.includes(opt.id) ? p.filter(x => x !== opt.id) : [...p, opt.id])} className={`p-6 rounded-2xl border-2 text-right font-bold transition-all ${selectedOptions.includes(opt.id) ? 'border-blue-500 bg-blue-50 shadow-md' : 'bg-white border-slate-100 hover:border-slate-300'}`}>{opt.text}</button>
+                                            <button key={opt.id} onClick={() => dynamicQuestions[questionIndex].type === 'multiple' ? setSelectedOptions([opt.id]) : setSelectedOptions(p => p.includes(opt.id) ? p.filter(x => x !== opt.id) : [...p, opt.id])} className={`p-6 rounded-2xl border-2 text-right font-bold transition-all ${selectedOptions.includes(opt.id) ? 'border-blue-500 bg-blue-50 shadow-md scale-[1.02]' : 'bg-white border-slate-100 hover:border-slate-300'}`}>{opt.text}</button>
                                         ))
                                     )}
                                 </div>
-                                {dynamicQuestions[questionIndex].type !== 'wordcloud' && <button onClick={submitAnswer} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-xl shadow-lg">אישור</button>}
+                                {dynamicQuestions[questionIndex].type !== 'wordcloud' && <button onClick={submitAnswer} disabled={selectedOptions.length === 0} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-xl shadow-lg disabled:opacity-50">אישור ובדיקה</button>}
                             </div>
                         )}
 
-                        {/* טבלת מובילים אחרי שאלה */}
+                        {/* מסך חיווי מיידי - הפיצ'ר החדש */}
+                        {currentStep === 'instant_feedback' && (
+                            <div className="text-center mt-20 animate-pop">
+                                {lastResult?.type === 'wordcloud' ? (
+                                    <div className="bg-white p-16 rounded-[3rem] shadow-2xl border border-blue-100">
+                                        <div className="text-8xl mb-8">💬</div>
+                                        <h2 className="text-5xl font-black text-blue-600 mb-12">תודה על השיתוף!</h2>
+                                        <button onClick={() => setCurrentStep('leaderboard')} className="bg-slate-900 text-white py-5 px-16 rounded-2xl text-xl font-bold">המשך לתוצאות המשלחת</button>
+                                    </div>
+                                ) : (
+                                    <div className={`p-16 rounded-[3rem] shadow-2xl border ${lastResult?.isCorrect ? 'bg-white border-green-200' : 'bg-white border-red-200'}`}>
+                                        <div className="text-9xl mb-8">{lastResult?.isCorrect ? "✅" : "❌"}</div>
+                                        <h2 className={`text-6xl font-black mb-6 ${lastResult?.isCorrect ? 'text-green-600' : 'text-red-500'}`}>
+                                            {lastResult?.isCorrect ? "נכון מאוד!" : "טעות..."}
+                                        </h2>
+                                        <p className="text-2xl text-slate-500 mb-12 font-bold">קיבלת {lastResult?.points || 0} נקודות</p>
+                                        <button onClick={() => setCurrentStep('leaderboard')} className="bg-slate-900 text-white py-5 px-16 rounded-2xl text-xl font-bold shadow-xl">איפה אני בטבלה? 📊</button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {currentStep === 'leaderboard' && (
                             <div className="space-y-6 animate-slide">
                                 <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl border">
-                                    <div className="flex justify-between items-center mb-6">
-                                        <h2 className="text-2xl font-black">🏆 5 המובילים במשלחת</h2>
-                                        <button onClick={() => setCurrentStep('feedback')} className="bg-slate-900 text-white py-2 px-6 rounded-xl font-bold text-sm hover:bg-slate-800 transition-colors">לסיכום השאלה ➔</button>
+                                    <div className="flex justify-between items-center mb-8 border-b pb-4">
+                                        <h2 className="text-2xl font-black flex items-center gap-2">🏆 מובילים כרגע</h2>
+                                        <button onClick={() => setCurrentStep('feedback')} className="bg-blue-600 text-white py-2 px-6 rounded-xl font-bold text-sm shadow-md">לסיכום השאלה ➔</button>
                                     </div>
-                                    {leaderboard.map((p, i) => (
-                                        <div key={p.id} className={`flex justify-between p-4 mb-2 rounded-xl font-bold ${p.id === user.uid ? 'bg-blue-50 border-blue-200 border animate-pulse' : 'bg-slate-50'}`}>
-                                            <span>{i+1}. {p.name}</span>
-                                            <span className="text-blue-600">{p.score}</span>
-                                        </div>
-                                    ))}
+                                    <div className="space-y-3">
+                                        {leaderboard.map((p, i) => (
+                                            <div key={p.id} className={`flex justify-between p-5 rounded-2xl font-bold ${p.id === user.uid ? 'bg-blue-50 border-blue-200 border animate-pulse' : 'bg-slate-50'}`}>
+                                                <span className="text-xl">{i+1}. {p.name}</span>
+                                                <span className="text-blue-600 text-2xl">{p.score}</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         )}
 
-                        {/* סיכום שאלה, תוצאות ומשפט מסכם */}
                         {currentStep === 'feedback' && (
                             <div className="text-center animate-slide bg-white p-8 rounded-[3rem] shadow-xl border overflow-hidden">
+                                <h2 className="text-3xl font-black mb-8 text-blue-600 border-b pb-4">סיכום השאלה</h2>
                                 
-                                {/* חיווי נכון/טעות */}
-                                <div className="mb-8 animate-pop">
-                                    {lastResult?.type === 'wordcloud' ? (
-                                        <div className="text-blue-600 text-4xl font-black">תודה על השיתוף! 💬</div>
-                                    ) : (
-                                        lastResult?.isCorrect ? (
-                                            <div className="text-green-600 text-5xl font-black drop-shadow-sm">נכון מאוד! ✨</div>
-                                        ) : (
-                                            <div className="text-red-500 text-5xl font-black drop-shadow-sm">טעות... ❌</div>
-                                        )
-                                    )}
-                                </div>
-
                                 {dynamicQuestions[questionIndex].type !== 'wordcloud' && (
-                                    <div className="mb-6 p-5 bg-green-50 rounded-2xl border border-green-100 text-right">
-                                        <p className="text-green-800 font-bold mb-1 text-sm">התשובה הנכונה:</p>
-                                        <p className="font-black text-lg leading-tight">{dynamicQuestions[questionIndex].options.filter(o => o.correct).map(o => o.text).join(', ')}</p>
+                                    <div className="mb-6 p-6 bg-green-50 rounded-2xl border border-green-100 text-right">
+                                        <p className="text-green-800 font-bold mb-2 text-sm uppercase">התשובה הנכונה הייתה:</p>
+                                        <p className="font-black text-xl leading-snug">{dynamicQuestions[questionIndex].options.filter(o => o.correct).map(o => o.text).join(', ')}</p>
                                     </div>
                                 )}
 
-                                <div className="mb-8 text-right bg-blue-50 p-5 rounded-2xl border border-blue-100">
-                                    <p className="text-blue-400 font-bold text-xs mb-1 uppercase tracking-wider">משפט מסכם:</p>
-                                    <p className="text-lg font-bold leading-relaxed text-slate-800">{dynamicQuestions[questionIndex].summary || "למידה משותפת מחזקת את המשלחת!"}</p>
+                                <div className="mb-8 text-right bg-slate-50 p-6 rounded-2xl border">
+                                    <p className="text-slate-400 font-bold text-xs mb-2 uppercase tracking-widest">משפט מסכם:</p>
+                                    <p className="text-xl font-bold leading-relaxed text-slate-800">{dynamicQuestions[questionIndex].summary || "למידה משותפת מחזקת את המשלחת!"}</p>
                                 </div>
 
                                 <div className="mb-10 text-right">
-                                    <p className="font-black mb-4 border-b pb-2 text-slate-400">איך המשלחת ענתה?</p>
+                                    <p className="font-black mb-4 text-slate-400 border-b pb-2">פילוח תשובות המשלחת:</p>
                                     {dynamicQuestions[questionIndex].type === 'wordcloud' ? (
-                                        <div className="flex flex-wrap gap-2 justify-center p-6 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
-                                            {wordCloudData.map((w, i) => <span key={i} style={{ fontSize: `${1 + (w.value * 0.4)}rem` }} className="font-black text-blue-600 px-2 leading-none">{w.text}</span>)}
-                                            {wordCloudData.length === 0 && <p className="text-slate-300">מחכים לתשובות...</p>}
+                                        <div className="flex flex-wrap gap-2 justify-center p-8 bg-blue-50 rounded-3xl border-2 border-dashed border-blue-200">
+                                            {wordCloudData.map((w, i) => <span key={i} style={{ fontSize: `${1.2 + (w.value * 0.5)}rem` }} className="font-black text-blue-600 px-3">{w.text}</span>)}
+                                            {wordCloudData.length === 0 && <p className="text-slate-400">מחכים לתשובות...</p>}
                                         </div>
                                     ) : (
                                         <div className="space-y-2">
                                             {dynamicQuestions[questionIndex].options.map(opt => {
                                                 const count = answers.filter(a => a.questionId === dynamicQuestions[questionIndex].id && Array.isArray(a.answer) && a.answer.includes(opt.id)).length;
                                                 return (
-                                                    <div key={opt.id} className={`flex justify-between items-center p-3 px-4 rounded-xl text-sm border ${opt.correct ? 'bg-green-50 border-green-200' : 'bg-white border-slate-100'}`}>
+                                                    <div key={opt.id} className={`flex justify-between items-center p-4 rounded-xl border ${opt.correct ? 'bg-green-50 border-green-300' : 'bg-white border-slate-100'}`}>
                                                         <span className={`flex-1 text-right ml-4 ${opt.correct ? "font-black text-green-700" : "text-slate-600"}`}>{opt.text}</span>
-                                                        <span className="bg-blue-600 text-white px-3 py-1 rounded-full font-black min-w-[40px] text-center">{count}</span>
+                                                        <span className="bg-blue-600 text-white px-3 py-1 rounded-full font-black min-w-[45px] text-center shadow-sm">{count}</span>
                                                     </div>
                                                 );
                                             })}
@@ -339,89 +346,74 @@
                                     if (questionIndex < dynamicQuestions.length - 1) { 
                                         setQuestionIndex(i => i + 1); setSelectedOptions([]); setTimeLeft(20); setHasAnswered(false); setWordCloudInput(''); setCurrentStep('quiz'); 
                                     } else { setCurrentStep('results'); }
-                                }} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-xl shadow-xl hover:bg-blue-700 transition-colors">לשאלה הבאה</button>
+                                }} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-xl shadow-xl hover:bg-blue-700">המשך לשאלה הבאה</button>
                             </div>
                         )}
 
-                        {/* מסך סיום */}
                         {currentStep === 'results' && (
                             <div className="text-center animate-slide">
                                 <div className="text-8xl mb-6">🏆</div>
                                 <h2 className="text-5xl font-black mb-10 text-slate-800">החידון הסתיים!</h2>
-                                <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl border mb-10">
+                                <div className="bg-white p-8 rounded-[3rem] shadow-2xl border mb-10">
                                     <h2 className="text-2xl font-black mb-8 border-b pb-4">טבלת המנצחים הסופית 👑</h2>
                                     {leaderboard.map((p, i) => (
-                                        <div key={p.id} className={`flex justify-between p-6 mb-3 rounded-2xl font-black text-2xl transition-transform ${i === 0 ? 'bg-blue-600 text-white scale-105 shadow-xl' : 'bg-slate-50 text-slate-700'}`}>
+                                        <div key={p.id} className={`flex justify-between p-6 mb-3 rounded-2xl font-black text-2xl transition-transform ${i === 0 ? 'bg-blue-600 text-white scale-105 shadow-2xl' : 'bg-slate-50'}`}>
                                             <span>{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i+1) + '.'} {p.name}</span>
                                             <span>{p.score}</span>
                                         </div>
                                     ))}
                                 </div>
-                                <button onClick={() => window.location.reload()} className="bg-slate-900 text-white py-6 px-20 rounded-2xl text-xl font-black shadow-2xl hover:bg-slate-800 transition-colors">משחק חדש</button>
+                                <button onClick={() => window.location.reload()} className="bg-slate-900 text-white py-6 px-20 rounded-2xl text-xl font-black shadow-2xl">משחק חדש 🔄</button>
                             </div>
                         )}
 
-                        {/* פאנל ניהול */}
                         {currentStep === 'admin_panel' && (
                             <div className="space-y-6 animate-slide">
                                 <div className="flex justify-between items-center bg-white p-6 rounded-3xl border sticky top-4 z-50 shadow-md">
-                                    <h2 className="text-2xl font-black text-slate-800">ניהול שאלות ותשובות ⚙️</h2>
+                                    <h2 className="text-2xl font-black text-slate-800">ניהול מערכת ⚙️</h2>
                                     <div className="flex gap-2">
-                                        <button onClick={resetGame} className="bg-red-500 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-red-600 transition-colors">איפוס משחק 🗑️</button>
-                                        <button onClick={() => setCurrentStep('login')} className="bg-slate-200 px-4 py-2 rounded-xl text-sm font-bold hover:bg-slate-300 transition-colors">יציאה</button>
+                                        <button onClick={resetGame} className="bg-red-500 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-red-600">איפוס משחק 🗑️</button>
+                                        <button onClick={() => setCurrentStep('login')} className="bg-slate-200 px-4 py-2 rounded-xl text-sm font-bold hover:bg-slate-300">יציאה</button>
                                     </div>
                                 </div>
                                 {dynamicQuestions.map((q, qIdx) => (
-                                    <div key={q.id} className="bg-white p-8 rounded-[2.5rem] shadow-lg border space-y-4 text-right">
+                                    <div key={q.id} className="bg-white p-8 rounded-[2rem] shadow-lg border space-y-4 text-right">
                                         <div className="flex justify-between border-b pb-2">
-                                            <span className="font-black text-blue-600">שאלה {qIdx + 1} ({q.type})</span>
-                                            <button onClick={() => { if(confirm("למחוק שאלה?")) setDynamicQuestions(dynamicQuestions.filter((_, i) => i !== qIdx)); }} className="text-red-400 text-xs font-bold hover:underline">מחיקת שאלה</button>
+                                            <span className="font-black text-blue-600 underline">שאלה {qIdx + 1}</span>
+                                            <button onClick={() => { if(confirm("למחוק שאלה?")) setDynamicQuestions(dynamicQuestions.filter((_, i) => i !== qIdx)); }} className="text-red-400 text-xs font-bold">מחיקה</button>
                                         </div>
-                                        
-                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">טקסט השאלה:</label>
-                                        <textarea className="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-blue-200 rounded-xl font-bold text-lg outline-none transition-all" value={q.question} onChange={e => { const n = [...dynamicQuestions]; n[qIdx].question = e.target.value; setDynamicQuestions(n); }} placeholder="מה השאלה?" />
-                                        
-                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">משפט מסכם (יוצג אחרי התשובה):</label>
-                                        <textarea className="w-full p-4 bg-blue-50 border-2 border-transparent focus:border-blue-200 rounded-xl font-bold outline-none transition-all" value={q.summary} onChange={e => { const n = [...dynamicQuestions]; n[qIdx].summary = e.target.value; setDynamicQuestions(n); }} placeholder="כתבו כאן את המסר הלימודי של השאלה..." />
+                                        <textarea className="w-full p-4 bg-slate-50 border-2 rounded-xl font-bold" value={q.question} onChange={e => { const n = [...dynamicQuestions]; n[qIdx].question = e.target.value; setDynamicQuestions(n); }} />
+                                        <label className="block text-xs font-bold text-slate-400">משפט מסכם:</label>
+                                        <textarea className="w-full p-4 bg-blue-50 border-2 rounded-xl" value={q.summary} onChange={e => { const n = [...dynamicQuestions]; n[qIdx].summary = e.target.value; setDynamicQuestions(n); }} />
                                         
                                         {q.type !== 'wordcloud' && (
-                                            <div className="space-y-3 pt-4">
-                                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">תשובות אפשריות (סמנו מה נכון):</p>
+                                            <div className="space-y-3 pt-4 border-t">
                                                 {q.options.map((opt, oIdx) => (
-                                                    <div key={opt.id} className="flex gap-2 items-center bg-slate-50 p-2 rounded-xl border border-slate-100">
+                                                    <div key={opt.id} className="flex gap-2 items-center bg-slate-50 p-2 rounded-xl border">
                                                         <input type="text" className="flex-1 p-2 bg-white border rounded-lg text-sm font-bold outline-none" value={opt.text} onChange={e => { const n = [...dynamicQuestions]; n[qIdx].options[oIdx].text = e.target.value; setDynamicQuestions(n); }} />
                                                         <button onClick={() => { 
                                                             const n = [...dynamicQuestions]; 
                                                             if (q.type === 'multiple') n[qIdx].options.forEach(o => o.correct = false);
                                                             n[qIdx].options[oIdx].correct = !n[qIdx].options[oIdx].correct;
                                                             setDynamicQuestions(n);
-                                                        }} className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${opt.correct ? 'bg-green-600 text-white shadow-md' : 'bg-white text-slate-300 border'}`}>נכון</button>
-                                                        <button onClick={() => {
-                                                            const n = [...dynamicQuestions];
-                                                            n[qIdx].options = n[qIdx].options.filter((_, i) => i !== oIdx);
-                                                            setDynamicQuestions(n);
-                                                        }} className="text-red-300 px-2 font-bold hover:text-red-500">✕</button>
+                                                        }} className={`px-4 py-2 rounded-lg text-xs font-black ${opt.correct ? 'bg-green-600 text-white shadow-md' : 'bg-white text-slate-300 border'}`}>נכון</button>
+                                                        <button onClick={() => { const n = [...dynamicQuestions]; n[qIdx].options = n[qIdx].options.filter((_, i) => i !== oIdx); setDynamicQuestions(n); }} className="text-red-300 px-2 font-bold">✕</button>
                                                     </div>
                                                 ))}
-                                                <button onClick={() => {
-                                                    const n = [...dynamicQuestions];
-                                                    n[qIdx].options.push({ id: Math.random().toString(36).substr(2, 9), text: 'תשובה חדשה', correct: false });
-                                                    setDynamicQuestions(n);
-                                                }} className="bg-slate-100 text-slate-600 text-xs font-bold py-2 px-4 rounded-lg hover:bg-blue-100 hover:text-blue-600 transition-all">+ הוספת אפשרות לתשובה</button>
+                                                <button onClick={() => { const n = [...dynamicQuestions]; n[qIdx].options.push({ id: Math.random().toString(36).substr(2, 9), text: 'תשובה חדשה', correct: false }); setDynamicQuestions(n); }} className="bg-slate-100 text-slate-600 text-xs font-bold py-2 px-4 rounded-lg hover:bg-blue-100 transition-all">+ הוספת אפשרות</button>
                                             </div>
                                         )}
-                                        <button onClick={() => { db.collection('artifacts').doc(appId).collection('public').doc('data').collection('config').doc('questions').set({ list: dynamicQuestions }); alert("הנתונים נשמרו בהצלחה ב-Firebase!"); }} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-lg shadow-lg hover:bg-blue-700 transition-all mt-4">שמור שינויים ב-Firebase 💾</button>
+                                        <button onClick={() => { db.collection('artifacts').doc(appId).collection('public').doc('data').collection('config').doc('questions').set({ list: dynamicQuestions }); alert("נשמר ב-Firebase!"); }} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-lg shadow-lg hover:bg-blue-700 transition-all">שמור שינויים 💾</button>
                                     </div>
                                 ))}
-                                <button onClick={() => setDynamicQuestions([...dynamicQuestions, { id: Date.now(), type: 'multiple', question: 'שאלה חדשה', options: [{id: 'a', text: 'תשובה 1', correct: true}], summary: '' }])} className="w-full py-10 border-4 border-dashed border-slate-200 rounded-[2.5rem] text-slate-400 font-black text-xl hover:bg-white hover:border-blue-200 hover:text-blue-400 transition-all">+ הוספת שאלה חדשה למאגר</button>
+                                <button onClick={() => setDynamicQuestions([...dynamicQuestions, { id: Date.now(), type: 'multiple', question: 'שאלה חדשה', options: [{id: 'a', text: 'תשובה 1', correct: true}], summary: '' }])} className="w-full py-8 border-4 border-dashed rounded-[2.5rem] text-slate-400 font-black">+ הוספת שאלה חדשה</button>
                             </div>
                         )}
 
-                        {/* כניסת אדמין */}
                         {currentStep === 'admin_login' && (
                             <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl border text-center max-w-sm mx-auto mt-20 animate-slide">
-                                <h2 className="text-2xl font-black mb-6">כניסת מנהלת ⚙️</h2>
-                                <input type="password" placeholder="הקישי סיסמה..." className="w-full p-4 rounded-xl border-2 mb-4 text-center font-black outline-none focus:border-blue-500" value={adminPass} onChange={e => setAdminPass(e.target.value)} onKeyDown={e => e.key === 'Enter' && adminPass === '12345' && setCurrentStep('admin_panel')} autoFocus />
+                                <h2 className="text-2xl font-black mb-6 tracking-tight">כניסת מנהלת ⚙️</h2>
+                                <input type="password" placeholder="סיסמה" className="w-full p-4 rounded-xl border-2 mb-4 text-center font-black outline-none focus:border-blue-500 shadow-inner" value={adminPass} onChange={e => setAdminPass(e.target.value)} onKeyDown={e => e.key === 'Enter' && adminPass === '12345' && setCurrentStep('admin_panel')} autoFocus />
                                 <button onClick={() => adminPass === '12345' ? setCurrentStep('admin_panel') : alert("סיסמה שגויה")} className="w-full bg-slate-900 text-white py-4 rounded-xl font-black">כניסה</button>
                             </div>
                         )}
